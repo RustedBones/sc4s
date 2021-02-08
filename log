@@ -1,0 +1,322 @@
+{device_id: "92160ea01519e7d25e9745aec0a9328dbdfd6781" error_code: 601 response_body: "Not found" request: "http://192.168.0.36:40281/zc/0
+action=addUser&
+userName=1112388654&
+blob=6lM2HmddAH5Sm3Qjvc7cZiXt6jyzwe5Q0KYg7yDDWVG1P9LHoaAxs63L6L8DePjzrwbv4FRJLHfbtcXz3TEdDz83xIf5W3CwibV3nXr3VP758oVxL7Cxtwvhbp5objbgW2W4P2ypEyaUuIKtMhX7tQDlLZUwh9fYFITMATGKWrgp7UjEo6JsDHM2cyioaGgbNrLshExtd0abGF9cStmF9ZR0%2FqFiO9icJw%2FlPduH0E2CkzgbqlOMPOVqqSZHsaBvbKdVHg9RhRosOW1DN%2FMtaVPTJXPOU8ZFd6Iiq9RVY3H17ezgdLSBLIPx3DgNwgwtV%2BHwgPl6vMCvZH7C&
+clientKey=FVB28Wak3S5Sr252kjhKB4d1tk0qASAVMb8ErrixXLZsDXFsJlx9l8ASkH41PLgu0%2FTlpDCg5t4gEEFQ%2Fw0fcY%2BRS4ong48cJNX4Go9tYQUJDnt%2F5uZ3KU8iljnReXyS&
+tokenType=default&
+deviceName=micheld-thinkpad&
+deviceId=8cf20c852224064bde736d8d099145adb98948a6&
+version=2.7.1" esdk_internal_error_code: 0 context: "
+
+23:05:26.733 D [connect_credentials_fetcher.cpp:78] ConnectCredentialsFetcher::getConnectCredentialsAsync: create a token with type \"default\"
+
+23:05:26.741 E [connect_zeroconf_login_protocol.cpp:113] ConnectZeroconfLoginProtocol::login: failed device=92160ea01519e7d25e9745aec0a9328dbdfd6781, error=601 log_extra http_error:404 
+
+23:05:20.238 D [discovery_network.cpp:83        ] Searching for devices on the outbound network interface 192.168.0.36
+
+23:05:20.315 D [discovery_network.cpp:83        ] Searching for devices on the outbound network interface 192.168.0.36
+
+23:05:20.361 E [pubsub_subscription.cpp:525     ] aq: AuthorizeWithToken
+
+23:05:20.385 E [pubsub_subscription.cpp:583     ] aq: on GoOnline[Offline] -> [Online]
+
+23:05:20.435 E [pubsub_subscription.cpp:583     ] aq: on GoOnline[Idle] -> [Resolving]
+
+23:05:20.486 E [pubsub_subscription.cpp:583     ] aq: on OnResolved[Resolving] -> [Connecting]
+
+23:05:20.486 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS
+
+23:05:20.486 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_PROTOCOL_INIT
+
+23:05:20.486 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS__unknown__
+
+23:05:20.501 E [pubsub_subscription.cpp:298     ] connectivityChanged(), is_logged_in:1
+
+23:05:20.502 E [pubsub_subscription.cpp:687     ] aq: clearConnectionId()
+
+23:05:20.503 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_WSI_CREATE
+
+23:05:20.503 E [pubsub_subscription.cpp:583     ] aq: on GoOffline[Online] -> [Offline]
+
+23:05:20.503 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS__unknown__
+
+23:05:20.503 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_CONNECTION_ERROR
+
+23:05:20.503 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_WSI_DESTROY
+
+23:05:20.503 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_PROTOCOL_DESTROY
+
+23:05:20.503 E [pubsub_subscription.cpp:565     ] aq: OnError reason: 3, error:User requested disconnect
+
+23:05:20.503 E [pubsub_subscription.cpp:583     ] aq: Disconnected
+
+23:05:20.503 E [pubsub_subscription.cpp:583     ] aq: on GoOnline[Offline] -> [Online]
+
+23:05:20.504 E [connectivity_listener.cpp:60    ] ConnectConnectivityListener: received empty connection_id
+
+
+23:05:20.504 E [pubsub_subscription.cpp:525     ] aq: AuthorizeWithToken
+
+23:05:20.527 E [pubsub_subscription.cpp:687     ] aq: clearConnectionId()
+
+23:05:20.527 E [connectivity_listener.cpp:60    ] ConnectConnectivityListener: received empty connection_id
+
+
+23:05:20.554 E [pubsub_subscription.cpp:583     ] aq: on GoOnline[Idle] -> [Resolving]
+
+23:05:20.554 E [pubsub_subscription.cpp:583     ] aq: on GoOnline[Online] -> [Online]
+
+23:05:20.604 E [pubsub_subscription.cpp:583     ] aq: on GoOnline[Idle] -> [Resolving]
+
+23:05:20.654 E [pubsub_subscription.cpp:583     ] aq: on OnResolved[Resolving] -> [Connecting]
+
+23:05:20.654 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_OPENSSL_LOAD_EXTRA_CLIENT_VERIFY_CERTS
+
+23:05:20.654 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_PROTOCOL_INIT
+
+23:05:20.654 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS__unknown__
+
+23:05:20.654 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_WSI_CREATE
+
+23:05:20.655 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_GET_THREAD_ID
+
+23:05:20.655 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_EVENT_WAIT_CANCELLED
+
+23:05:20.722 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_APPEND_HANDSHAKE_HEADER
+
+23:05:20.722 E [pubsub_subscription.cpp:583     ] aq: Aqueduct set User-Agent:Spotify/1.1.46.916.g416cacf1 Linux/5.4.0-58-generic (Aqueduct/v1.2.135-715d0a93)
+
+23:05:20.749 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_FILTER_PRE_ESTABLISH
+
+23:05:20.749 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_ESTABLISHED
+
+23:05:20.753 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_RECEIVE
+
+23:05:20.753 E [pubsub_subscription.cpp:583     ] aq: on OnConnected[Connecting] -> [Connected]
+
+23:05:20.753 E [pubsub_subscription.cpp:543     ] aq: OnNewConnectionId: YzcyYWQ4NmQtMmM1Yi00ZjIzLThjMjctMTViNzA5ZDljYjgwK2RlYWxlcit0Y3A6Ly9nZXcxLWRlYWxlci1iLXY2cGIuZ2V3MS5zcG90aWZ5Lm5ldDo1NzAwKzI5QjAxMTEzNDFCNjcxMDk2QkNFRDUzOUNENkE3QzQxMTJBQzMwOThFOUY5NUI5QjUyQkM3NDI0RDk0NzlCNkY=
+
+23:05:20.753 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_WRITEABLE
+
+23:05:20.754 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_WRITEABLE
+
+23:05:20.763 E [pubsub_subscription.cpp:549     ] aq: OnNewConnectionId: YzcyYWQ4NmQtMmM1Yi00ZjIzLThjMjctMTViNzA5ZDljYjgwK2RlYWxlcit0Y3A6Ly9nZXcxLWRlYWxlci1iLXY2cGIuZ2V3MS5zcG90aWZ5Lm5ldDo1NzAwKzI5QjAxMTEzNDFCNjcxMDk2QkNFRDUzOUNENkE3QzQxMTJBQzMwOThFOUY5NUI5QjUyQkM3NDI0RDk0NzlCNkY=
+
+23:05:20.764 E [connectivity_listener.cpp:53    ] ConnectConnectivityListener: received new_connection_id YzcyYWQ4NmQtMmM1Yi00ZjIzLThjMjctMTViNzA5ZDljYjgwK2RlYWxlcit0Y3A6Ly9nZXcxLWRlYWxlci1iLXY2cGIuZ2V3MS5zcG90aWZ5Lm5ldDo1NzAwKzI5QjAxMTEzNDFCNjcxMDk2QkNFRDUzOUNENkE3QzQxMTJBQzMwOThFOUY5NUI5QjUyQkM3NDI0RDk0NzlCNkY= - starting 
+
+
+23:05:20.780 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_RECEIVE_PONG
+
+23:05:20.885 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_RECEIVE
+
+23:05:21.187 E [pubsub_subscription.cpp:583     ] aq: LWS got LWS_CALLBACK_CLIENT_RECEIVE
+
+23:05:24.677 D [connect_credentials_fetcher.cpp:78] ConnectCredentialsFetcher::getConnectCredentialsAsync: create a token with type \"default\"
+
+23:05:24.731 E [connect_zeroconf_login_protocol.cpp:113] ConnectZeroconfLoginProtocol::login: failed device=92160ea01519e7d25e9745aec0a9328dbdfd6781, error=601 log_extra http_error:404 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"}
