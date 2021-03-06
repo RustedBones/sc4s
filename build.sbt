@@ -51,6 +51,7 @@ lazy val commonSettings =
 lazy val `sc4s` = (project in file("."))
   .settings(commonSettings: _*)
   .settings(
+    headerSources / excludeFilter := HiddenFileFilter || (_.getPath.contains("xyz/gianlu/librespot")),
     libraryDependencies ++= Seq(
       Dependencies.CirceGeneric,
       Dependencies.CirceLiteral,
