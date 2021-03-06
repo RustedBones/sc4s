@@ -64,6 +64,6 @@ lazy val `sc4s` = (project in file("."))
       Dependencies.TsecHash,
       Dependencies.TsecMac,
       Dependencies.Test.MUnit,
-      Dependencies.Test.MUnitCatsEffect,
+      Dependencies.Test.MUnitCatsEffect
     )
   )
