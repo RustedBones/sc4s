@@ -28,7 +28,7 @@ lazy val commonSettings =
       scalacOptions ~= filterScalacOptions,
       homepage := Some(url(s"https://github.com/$username/$repo")),
       licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
-      startYear := Some(2020),
+      startYear := Some(2021),
       scmInfo := Some(ScmInfo(url(s"https://github.com/$username/$repo"), s"git@github.com:$username/$repo.git")),
       developers := List(
         Developer(
