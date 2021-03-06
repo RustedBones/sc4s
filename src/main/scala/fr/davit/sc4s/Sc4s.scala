@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Michel Davit
+ * Copyright 2021 Michel Davit
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -70,20 +70,19 @@ object Sc4s extends IOApp {
       blocker <- Blocker[IO]
     } yield (server, ap, blocker)
 
-    resources.use {
-      case (server, _, _) =>
-        val zeroconf = Zeroconf.Instance(
-          ZeroconfService,
-          "sc4s",
-          server.baseUri.port.get,
-          s"${InetAddress.getLocalHost.getHostName}.local",
-          Map("VERSION" -> "1.0", "CPath" -> ZeroconfAppPath, "Stack" -> "SP")
-        )
+    resources.use { case (server, _, _) =>
+      val zeroconf = Zeroconf.Instance(
+        ZeroconfService,
+        "sc4s",
+        server.baseUri.port.get,
+        s"${InetAddress.getLocalHost.getHostName}.local",
+        Map("VERSION" -> "1.0", "CPath" -> ZeroconfAppPath, "Stack" -> "SP")
+      )
 
-        for {
-          _ <- IO(println(s"zc server listening on ${server.baseUri}"))
-          _ <- Zeroconf.register[IO](zeroconf).compile.drain
-        } yield ExitCode.Success
+      for {
+        _ <- IO(println(s"zc server listening on ${server.baseUri}"))
+        _ <- Zeroconf.register[IO](zeroconf).compile.drain
+      } yield ExitCode.Success
     }
   }
 

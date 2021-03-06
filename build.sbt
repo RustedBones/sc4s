@@ -28,7 +28,7 @@ lazy val commonSettings =
       scalacOptions ~= filterScalacOptions,
       homepage := Some(url(s"https://github.com/$username/$repo")),
       licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
-      startYear := Some(2020),
+      startYear := Some(2021),
       scmInfo := Some(ScmInfo(url(s"https://github.com/$username/$repo"), s"git@github.com:$username/$repo.git")),
       developers := List(
         Developer(
@@ -51,6 +51,7 @@ lazy val commonSettings =
 lazy val `sc4s` = (project in file("."))
   .settings(commonSettings: _*)
   .settings(
+    headerSources / excludeFilter := HiddenFileFilter || (_.getPath.contains("xyz/gianlu/librespot")),
     libraryDependencies ++= Seq(
       Dependencies.CirceGeneric,
       Dependencies.CirceLiteral,
@@ -64,6 +65,6 @@ lazy val `sc4s` = (project in file("."))
       Dependencies.TsecHash,
       Dependencies.TsecMac,
       Dependencies.Test.MUnit,
-      Dependencies.Test.MUnitCatsEffect,
+      Dependencies.Test.MUnitCatsEffect
     )
   )

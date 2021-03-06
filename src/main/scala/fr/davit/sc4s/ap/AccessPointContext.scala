@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Michel Davit
+ * Copyright 2021 Michel Davit
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -183,8 +183,9 @@ object AccessPointContext {
         _            <- SHA1withRSA.verifySignature(signatureKey, serverKeyData, serverSignature)
         serverKey    <- DiffieHellman.generatePublicKey(BigInt(1, serverKeyData))
         secret       <- DiffieHellman.secret(priv, serverKey)
-        sharedKey     = new SecretKeySpec(secret, HmacSHA1.Algorithm)
-        challengeData = (clientHelloHeader ++ clientHelloPayload ++ apResponseHeader ++ apResponseMessagePayload).toArray
+        sharedKey = new SecretKeySpec(secret, HmacSHA1.Algorithm)
+        challengeData =
+          (clientHelloHeader ++ clientHelloPayload ++ apResponseHeader ++ apResponseMessagePayload).toArray
         data <- (1 to 5).toList
           .traverse(i => HmacSHA1.digest(sharedKey, challengeData ++ Array(i.toByte)))
           .map(_.reduce(_ ++ _))
