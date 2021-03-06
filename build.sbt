@@ -10,10 +10,10 @@ lazy val filterScalacOptions = { options: Seq[String] =>
 }
 
 // for sbt-github-actions
-ThisBuild / scalaVersion := "2.13.4"
+ThisBuild / scalaVersion := "2.13.5"
 ThisBuild / githubWorkflowBuild := Seq(
   WorkflowStep.Sbt(name = Some("Check project"), commands = List("scalafmtCheckAll", "headerCheckAll")),
-  WorkflowStep.Sbt(name = Some("Build project"), commands = List("compile")) // TODO run tests
+  WorkflowStep.Sbt(name = Some("Build project"), commands = List("compile", "test"))
 )
 ThisBuild / githubWorkflowTargetBranches := Seq("master")
 ThisBuild / githubWorkflowPublishTargetBranches := Seq.empty
@@ -54,11 +54,15 @@ lazy val `sc4s` = (project in file("."))
     libraryDependencies ++= Seq(
       Dependencies.CirceGeneric,
       Dependencies.CirceLiteral,
-      Dependencies.Http4sBlazeClient,
-      Dependencies.Http4sBlazeServer,
+      Dependencies.Http4sEmberClient,
+      Dependencies.Http4sEmberServer,
       Dependencies.Http4sCirce,
       Dependencies.Http4sDsl,
       Dependencies.Scout,
+      Dependencies.TsecCommon,
+      Dependencies.TsecCipher,
+      Dependencies.TsecHash,
+      Dependencies.TsecMac,
       Dependencies.Test.MUnit,
       Dependencies.Test.MUnitCatsEffect,
     )

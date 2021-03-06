@@ -1,3 +1,19 @@
+/*
+ * Copyright 2020 Michel Davit
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.davit.sc4s.ap
 
 import cats.effect._
@@ -8,12 +24,15 @@ import io.circe._
 import org.http4s._
 import org.http4s.circe._
 import org.http4s.client.Client
+import scalapb.GeneratedMessage
 
 import java.net.InetSocketAddress
 import scala.concurrent.duration._
 import scala.util.Random
 
 trait AccessPoint[F[_]] {
+
+  def listen(): fs2.Stream[F, GeneratedMessage]
 
   def authenticate(deviceId: String, credentials: LoginCredentials): F[Unit]
 
@@ -30,14 +49,14 @@ object AccessPoint {
     .map { case Array(host, port) => new InetSocketAddress(host, port.toInt) }
 
   implicit private val ApResolveDecoder: Decoder[ApResolve] =
-    Decoder(_.downField("ap_list").as[List[InetSocketAddress]].map(ApResolve))
+    Decoder(_.downField("accesspoint").as[List[InetSocketAddress]].map(ApResolve))
 
   implicit private def apResolveEntityDecoder[F[_]: Sync]: EntityDecoder[F, ApResolve] =
     jsonOf[F, ApResolve]
 
-  def resolve[F[_]: Concurrent: ContextShift](client: Client[F]): F[InetSocketAddress] = {
+  def resolve[F[_]: Sync](client: Client[F]): F[InetSocketAddress] = {
     client
-      .expect[ApResolve]("http://apresolve.spotify.com")
+      .expect[ApResolve]("http://apresolve.spotify.com?type=accesspoint")
       .map(_.apList)
       .map(Random.shuffle(_))
       .map(_.headOption.getOrElse(DefaultAp))
@@ -49,11 +68,13 @@ object AccessPoint {
       timeout: Option[FiniteDuration] = None
   ): Resource[F, AccessPoint[F]] =
     for {
-      b      <- Blocker[F]
-      group  <- SocketGroup[F](b)
-      socket <- group.client(address)
-      engine <- AccessPointEngine(socket, timeout)
+      b        <- Blocker[F]
+      group    <- SocketGroup[F](b)
+      socket   <- group.client(address)
+      apSocket <- Resource.liftF(AccessPointContext(socket, timeout))
     } yield new AccessPoint[F] {
+
+      override def listen(): fs2.Stream[F, GeneratedMessage] = apSocket.reads()
 
       override def authenticate(deviceId: String, credentials: LoginCredentials): F[Unit] = {
         val systemInfo = SystemInfo.defaultInstance
@@ -67,12 +88,9 @@ object AccessPoint {
           .withVersionString("0.1.0")
 
         for {
-          _       <- engine.write(clientResponseEncrypted)
-          welcome <- engine.read[APWelcome]()
-        } yield {
-          println(welcome)
-        }
+          _       <- apSocket.write(clientResponseEncrypted)
+          welcome <- apSocket.read[APWelcome]()
+        } yield println(welcome)
       }
-
     }
 }

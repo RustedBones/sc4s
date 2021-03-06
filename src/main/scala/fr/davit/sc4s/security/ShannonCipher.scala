@@ -1,12 +1,30 @@
+/*
+ * Copyright 2020 Michel Davit
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.davit.sc4s.security
 
-import scodec.bits.BitVector
+import scodec.bits.{BitVector, ByteVector}
 import scodec.codecs._
 import sun.security.util.SecurityConstants
 
 import java.lang.Integer._
 import java.security._
 import java.security.spec.AlgorithmParameterSpec
+import java.util.Base64
+import javax.crypto.spec.IvParameterSpec
 import javax.crypto.{AEADBadTagException, Cipher, CipherSpi, NoSuchPaddingException}
 import scala.collection.mutable
 import scala.util.chaining._
@@ -22,7 +40,11 @@ object ShannonCipher {
   // Word size
   val BlockSize = 4
 
-  final case class NonceParameterSpec(nonce: Int) extends AlgorithmParameterSpec
+  final class ShannonParameterSpec(iv: Array[Byte], nonce: Int) extends IvParameterSpec(iv) {
+    def getNonce: Int = nonce
+
+    override def toString: String = s"ShannonParameterSpec(${Base64.getEncoder.encodeToString(iv)}, $nonce)"
+  }
 
   object ShannonCipherProvider
       extends Provider("ShannonCipherProvider", SecurityConstants.PROVIDER_VER, "Shannon stream-cipher") {
@@ -34,8 +56,7 @@ class ShannonCipher extends CipherSpi {
 
   import ShannonCipher._
 
-  private var decrypting: Boolean            = false
-  private var nonce: Int                     = 0
+  private var decrypting: Boolean = false
 
   // Working storage for the shift register
   private val register: Array[Int] = Array.ofDim[Int](16)
@@ -70,53 +91,62 @@ class ShannonCipher extends CipherSpi {
 
   override def engineGetOutputSize(inputLen: Int): Int = if (decrypting) inputLen - BlockSize else inputLen + BlockSize
 
-  override def engineGetIV(): Array[Byte] = iv.map(int32L.encode).map(_.require.toByteVector).reduce(_ ++ _).toArray
+  override def engineGetIV(): Array[Byte] = iv.map(int32L.encode).flatMap(_.require.toByteVector.toArray)
 
   override def engineGetParameters(): AlgorithmParameters = null
 
-  override def engineInit(opmode: Int, key: Key, random: SecureRandom): Unit = init(opmode, key, 0)
+  override def engineInit(opmode: Int, key: Key, random: SecureRandom): Unit = init(opmode, genIv(key), 0)
 
   override def engineInit(opmode: Int, key: Key, params: AlgorithmParameterSpec, random: SecureRandom): Unit = {
-    val nonce = Option(params) match {
-      case None                        => 0
-      case Some(NonceParameterSpec(n)) => n
-      case Some(_)                     => throw new InvalidAlgorithmParameterException("Parameters not supported")
+    val (iv, nonce) = Option(params) match {
+      case None => (genIv(key), 0)
+      case Some(p: ShannonParameterSpec) =>
+        val intIv = sizedVector(16, int32L).decode(ByteVector(p.getIV).toBitVector).require.value.toArray
+        (intIv, p.getNonce)
+      case Some(p) =>
+        println(p.getClass.getCanonicalName)
+        println(classOf[ShannonParameterSpec].getCanonicalName)
+        throw new InvalidAlgorithmParameterException(s"Parameters not supported: $p")
     }
-    init(opmode, key, nonce)
+    init(opmode, iv, nonce)
   }
 
   override def engineInit(opmode: Int, key: Key, params: AlgorithmParameters, random: SecureRandom): Unit = {
-    if (params != null) throw new InvalidAlgorithmParameterException("Parameters not supported")
-    init(opmode, key, 0)
+    if (params != null) throw new InvalidAlgorithmParameterException(s"Parameters not supported $params")
+    init(opmode, genIv(key), 0)
   }
 
-  private def init(opmode: Int, key: Key, nonce: Int): Unit = {
+  private def genIv(key: Key): Array[Int] = {
+    if (key.getAlgorithm != "Shannon") throw new InvalidKeyException(s"Not an Shannon key: ${key.getAlgorithm}")
+    if (key.getFormat != "RAW") throw new InvalidKeyException("Key encoding format must be RAW")
+    k = InitKonst
+    InitVector.copyToArray(register)
+    load(key.getEncoded)
+    register.clone()
+  }
+
+  private def init(opmode: Int, iv: Array[Int], nonce: Int): Unit = {
     opmode match {
       case Cipher.DECRYPT_MODE => decrypting = true
       case Cipher.ENCRYPT_MODE => decrypting = false
       case _                   => new UnsupportedOperationException("Mode must be ENCRYPT_MODE or DECRYPT_MODE")
     }
-    if (key.getAlgorithm != "Shannon") throw new InvalidKeyException(s"Not an Shannon key: ${key.getAlgorithm}")
-    if (key.getFormat != "RAW") throw new InvalidKeyException("Key encoding format must be RAW")
-    this.nonce = nonce
-    generateIv(key.getEncoded)
-    nonceAndIncrement()
+    loadIv(iv)
+    loadNonce(nonce)
+    encryptionBuffer.clear()
+    macBuffer.clear()
   }
 
-  private def generateIv(data: Array[Byte]): Unit = {
-    k = InitKonst
-    InitVector.copyToArray(register)
-    load(data)
-    register.copyToArray(iv)
-  }
-
-  private def nonceAndIncrement(): Unit = {
-    k = InitKonst
+  private def loadIv(iv: Array[Int]): Unit = {
+    iv.copyToArray(this.iv)
     iv.copyToArray(register)
-    val data = int32L.encode(nonce).require.toByteVector.toArray
+  }
+
+  private def loadNonce(nonce: Int): Unit = {
+    k = InitKonst
+    val data = int32.encode(nonce).require.toByteVector.toArray
     load(data)
     k = register.head
-    nonce += 1
   }
 
   // Load key material into the register
@@ -278,9 +308,6 @@ class ShannonCipher extends CipherSpi {
       }
       inputLen + BlockSize
     }
-
-    // prepare for next stream message
-    nonceAndIncrement()
     size
   }
 }
