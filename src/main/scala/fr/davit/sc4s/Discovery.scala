@@ -170,11 +170,12 @@ object Discovery {
                 checksum <- HmacSHA1.digest(secretKey, "checksum".getBytes)
                 checksumKey = new SecretKeySpec(checksum, HmacSHA1.Algorithm)
                 mac <- HmacSHA1.digest(checksumKey, addUser.encrypted)
-                _ <- if (mac sameElements addUser.checksum) {
-                  Sync[F].unit
-                } else {
-                  Sync[F].raiseError(new DigestException("Checksum verification failed"))
-                }
+                _ <-
+                  if (mac sameElements addUser.checksum) {
+                    Sync[F].unit
+                  } else {
+                    Sync[F].raiseError(new DigestException("Checksum verification failed"))
+                  }
                 encryptionKeyHash <- HmacSHA1.digest(secretKey, "encryption".getBytes)
                 encryptionKey = new SecretKeySpec(encryptionKeyHash, 0, 16, AES.Algorithm)
                 blob <- AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, addUser.iv, addUser.encrypted)

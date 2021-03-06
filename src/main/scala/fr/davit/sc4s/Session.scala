@@ -5,6 +5,7 @@ sealed trait Session {
 }
 
 object Session {
+
   case object Disconnected extends Session {
     override def activeUser: Option[String] = None
   }
