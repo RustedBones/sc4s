@@ -18,7 +18,6 @@ package fr.davit.sc4s.ap
 
 import cats.effect._
 import cats.implicits._
-import com.google.protobuf.ByteString
 import fr.davit.sc4s.ap.authentication._
 import fr.davit.sc4s.ap.keyexchange.APLoginFailed
 import fs2.io.tcp.SocketGroup
