@@ -20,16 +20,16 @@ import cats.effect._
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.google.protobuf.ByteString
-import com.spotify.authentication.{APWelcome, ClientResponseEncrypted}
-import com.spotify.keyexchange.{BuildInfo => ApBuildInfo, _}
+import fr.davit.sc4s.ap.authentication._
+import fr.davit.sc4s.ap.keyexchange._
 import fr.davit.sc4s.security.DiffieHellman._
 import fr.davit.sc4s.security.ShannonCipher.ShannonParameterSpec
 import fr.davit.sc4s.security._
 import fs2._
 import fs2.io.tcp.Socket
 import scalapb.{GeneratedMessage, GeneratedMessageCompanion}
-import scodec._
-import scodec.bits._
+import scodec.{BuildInfo => _, _}
+import scodec.bits.{BuildInfo => _, _}
 import scodec.codecs._
 
 import java.security.Key
@@ -49,8 +49,6 @@ trait AccessPointContext[F[_]] {
 }
 
 object AccessPointContext {
-
-  class HandshakeException(loginFailed: APLoginFailed) extends Exception(loginFailed.errorCode.name)
 
   // format: off
   private val Modulus = BigInt(1, Array[Byte](
@@ -110,7 +108,7 @@ object AccessPointContext {
   ): F[AccessPointContext[F]] = {
 
     def hello(publicKey: DHPublicKey): ClientHello = {
-      val info = ApBuildInfo.defaultInstance
+      val info = BuildInfo.defaultInstance
         .withProduct(Product.PRODUCT_PARTNER)
         .withPlatform(Platform.PLATFORM_LINUX_X86)
         .withVersion(109800078L)

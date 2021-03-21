@@ -18,7 +18,8 @@ package fr.davit.sc4s.ap
 
 import cats.effect._
 import cats.implicits._
-import com.spotify.authentication._
+import fr.davit.sc4s.ap.authentication._
+import fr.davit.sc4s.ap.keyexchange.APLoginFailed
 import fs2.io.tcp.SocketGroup
 import io.circe._
 import org.http4s._
@@ -32,13 +33,15 @@ import scala.util.Random
 
 trait AccessPoint[F[_]] {
 
-  def listen(): fs2.Stream[F, GeneratedMessage]
-
-  def authenticate(deviceId: String, credentials: LoginCredentials): F[Unit]
+  def authenticate(deviceId: String, credentials: LoginCredentials): F[APWelcome]
 
 }
 
 object AccessPoint {
+
+  type Message = AccessPointMessage with GeneratedMessage
+
+  class LoginException(loginFailed: APLoginFailed) extends Exception(loginFailed.errorCode.name)
 
   private val DefaultAp: InetSocketAddress = new InetSocketAddress("ap.spotify.com", 443)
 
@@ -74,9 +77,7 @@ object AccessPoint {
       apSocket <- Resource.liftF(AccessPointContext(socket, timeout))
     } yield new AccessPoint[F] {
 
-      override def listen(): fs2.Stream[F, GeneratedMessage] = apSocket.reads()
-
-      override def authenticate(deviceId: String, credentials: LoginCredentials): F[Unit] = {
+      override def authenticate(deviceId: String, credentials: LoginCredentials): F[APWelcome] = {
         val systemInfo = SystemInfo.defaultInstance
           .withOs(Os.OS_UNKNOWN)
           .withCpuFamily(CpuFamily.CPU_UNKNOWN)
@@ -88,9 +89,14 @@ object AccessPoint {
           .withVersionString("0.1.0")
 
         for {
-          _       <- apSocket.write(clientResponseEncrypted)
-          welcome <- apSocket.read[APWelcome]()
-        } yield println(welcome)
+          _        <- apSocket.write(clientResponseEncrypted)
+          response <- apSocket.read[AccessPoint.Message]()
+          welcome <- response match {
+            case w: APWelcome     => Sync[F].pure(w)
+            case e: APLoginFailed => Sync[F].raiseError(new LoginException(e))
+            case _                => Sync[F].raiseError(new Exception(s"Unexpected response $response"))
+          }
+        } yield welcome
       }
     }
 }
