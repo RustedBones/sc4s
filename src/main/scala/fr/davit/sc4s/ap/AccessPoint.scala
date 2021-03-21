@@ -46,7 +46,10 @@ object AccessPoint {
 
   implicit private val InetSocketAddressDecoder: Decoder[InetSocketAddress] = Decoder.decodeString
     .map(_.split(':'))
-    .map { case Array(host, port) => new InetSocketAddress(host, port.toInt) }
+    .map {
+      case Array(host, port) => new InetSocketAddress(host, port.toInt)
+      case _                 => throw new Exception("Failed extraction socket address")
+    }
 
   implicit private val ApResolveDecoder: Decoder[ApResolve] =
     Decoder(_.downField("accesspoint").as[List[InetSocketAddress]].map(ApResolve))
