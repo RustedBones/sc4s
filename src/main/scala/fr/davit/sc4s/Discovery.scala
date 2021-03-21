@@ -190,11 +190,11 @@ object Discovery {
                         }
                       encryptionKeyHash <- HmacSHA1.digest(secretKey, "encryption".getBytes)
                       encryptionKey = new SecretKeySpec(encryptionKeyHash, 0, 16, AES.Algorithm)
-                      blob <- AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, addUser.iv, addUser.encrypted)
+                      blob        <- AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, addUser.iv, addUser.encrypted)
                       credentials <- decryptBlob(deviceId, addUser.userName, blob)
                       // TODO save userId -> blob
-                      _           <- ap.authenticate(deviceId, credentials)
-                      _           <- session.set(Session.Connected(addUser.userName))
+                      _ <- ap.authenticate(deviceId, credentials)
+                      _ <- session.set(Session.Connected(addUser.userName))
                     } yield json"""{
                               "status": 200,
                               "statusString": "OK",
