@@ -17,11 +17,14 @@
 package fr.davit.sc4s.security
 
 import cats.effect.IO
+import com.google.protobuf.ByteString
+import fr.davit.sc4s.ap.authentication.APAck
 import munit.CatsEffectSuite
 import xyz.gianlu.librespot
 import xyz.gianlu.librespot.common.Utils
 
 import java.security.MessageDigest
+import scala.util.Random
 
 class CryptoSpec extends CatsEffectSuite {
 

@@ -20,8 +20,8 @@ import cats.effect._
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.google.protobuf.ByteString
-import com.spotify.authentication.{AuthenticationType, LoginCredentials}
 import fr.davit.sc4s.ap.AccessPoint
+import fr.davit.sc4s.ap.authentication._
 import fr.davit.sc4s.security._
 import fr.davit.sc4s.security.DiffieHellman._
 import io.circe.literal._
@@ -163,39 +163,45 @@ object Discovery {
         case request @ POST -> Root =>
           request
             .decode[AddUser] { addUser =>
-              val authenticate = for {
-                secret     <- DiffieHellman.secret(privateKey, addUser.clientKey)
-                secretHash <- Sha1.digest(secret)
-                secretKey = new SecretKeySpec(secretHash, 0, 16, HmacSHA1.Algorithm)
-                checksum <- HmacSHA1.digest(secretKey, "checksum".getBytes)
-                checksumKey = new SecretKeySpec(checksum, HmacSHA1.Algorithm)
-                mac <- HmacSHA1.digest(checksumKey, addUser.encrypted)
-                _ <-
-                  if (mac sameElements addUser.checksum) {
-                    Sync[F].unit
-                  } else {
-                    Sync[F].raiseError(new DigestException("Checksum verification failed"))
-                  }
-                encryptionKeyHash <- HmacSHA1.digest(secretKey, "encryption".getBytes)
-                encryptionKey = new SecretKeySpec(encryptionKeyHash, 0, 16, AES.Algorithm)
-                blob <- AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, addUser.iv, addUser.encrypted)
-                // TODO save userId -> blob
-                credentials <- decryptBlob(deviceId, addUser.userName, blob)
-                _           <- ap.authenticate(deviceId, credentials)
-                _           <- session.set(Session.Connected(addUser.userName))
-              } yield ()
-
               val result = session.get
                 .map(_.activeUser)
                 .flatMap {
-                  case Some(addUser.userName) => Sync[F].unit
-                  case _                      => authenticate
+                  case Some(addUser.userName) =>
+                    Sync[F].pure(
+                      json"""{
+                         "status": 200,
+                         "statusString": "OK",
+                         "spotifyError": 0
+                       }"""
+                    )
+                  case _ =>
+                    for {
+                      secret     <- DiffieHellman.secret(privateKey, addUser.clientKey)
+                      secretHash <- Sha1.digest(secret)
+                      secretKey = new SecretKeySpec(secretHash, 0, 16, HmacSHA1.Algorithm)
+                      checksum <- HmacSHA1.digest(secretKey, "checksum".getBytes)
+                      checksumKey = new SecretKeySpec(checksum, HmacSHA1.Algorithm)
+                      mac <- HmacSHA1.digest(checksumKey, addUser.encrypted)
+                      _ <-
+                        if (mac sameElements addUser.checksum) {
+                          Sync[F].unit
+                        } else {
+                          Sync[F].raiseError(new DigestException("Checksum verification failed"))
+                        }
+                      encryptionKeyHash <- HmacSHA1.digest(secretKey, "encryption".getBytes)
+                      encryptionKey = new SecretKeySpec(encryptionKeyHash, 0, 16, AES.Algorithm)
+                      blob <- AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, addUser.iv, addUser.encrypted)
+                      credentials <- decryptBlob(deviceId, addUser.userName, blob)
+                      // TODO save userId -> blob
+                      _           <- ap.authenticate(deviceId, credentials)
+                      _           <- session.set(Session.Connected(addUser.userName))
+                    } yield json"""{
+                              "status": 200,
+                              "statusString": "OK",
+                              "spotifyError": 0
+                            }"""
                 }
-                .as(json"""{
-                     "status": 101,
-                     "statusString": "OK",
-                     "spotifyError": 0
-                   }""")
+
               Ok(result)
             }
             .handleErrorWith { e =>

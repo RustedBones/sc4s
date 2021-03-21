@@ -1,8 +1,11 @@
 syntax = "proto2";
 
-option java_package = "com.spotify";
+option java_package = "fr.davit.sc4s.ap";
+import "scalapb/scalapb.proto";
 
 message ClientResponseEncrypted {
+    option (scalapb.message).extends = "fr.davit.sc4s.ap.AccessPointMessage";
+
     required LoginCredentials login_credentials = 0xa;
     optional AccountCreation account_creation = 0x14;
     optional FingerprintResponseUnion fingerprint_response = 0x1e;
@@ -138,6 +141,8 @@ message ClientInfoFacebook {
 }
 
 message APWelcome {
+    option (scalapb.message).extends = "fr.davit.sc4s.ap.AccessPointMessage";
+
     required string canonical_username = 0xa;
     required AccountType account_type_logged_in = 0x14;
     required AccountType credentials_type_logged_in = 0x19;
