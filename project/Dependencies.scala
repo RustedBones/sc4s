@@ -5,7 +5,7 @@ object Dependencies {
   object Versions {
     val BouncyCastle    = "1.68"
     val Circe           = "0.14.0-M4"
-    val Http4s          = "0.21.20"
+    val Http4s          = "0.21.21"
     val MUnit           = "0.7.23"
     val MUnitCatsEffect = "0.13.1"
     val ScalaTest       = "3.2.2"
