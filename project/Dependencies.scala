@@ -7,7 +7,7 @@ object Dependencies {
     val Circe           = "0.14.0-M4"
     val Http4s          = "0.21.20"
     val MUnit           = "0.7.23"
-    val MUnitCatsEffect = "0.13.1"
+    val MUnitCatsEffect = "1.0.1"
     val ScalaTest       = "3.2.2"
     val Scout           = "0.1.0"
     val Tsec            = "0.2.1"
