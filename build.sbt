@@ -54,18 +54,19 @@ lazy val `sc4s` = (project in file("."))
     headerSources / excludeFilter := HiddenFileFilter || (_.getPath.contains("xyz/gianlu/librespot")),
     libraryDependencies ++= Seq(
       Dependencies.Protobuf.ScalaPb,
+      Dependencies.BouncyCastle,
       Dependencies.CirceGeneric,
       Dependencies.CirceLiteral,
+      Dependencies.CirceParser,
       Dependencies.Http4sEmberClient,
       Dependencies.Http4sEmberServer,
       Dependencies.Http4sCirce,
       Dependencies.Http4sDsl,
       Dependencies.Scout,
-      Dependencies.TsecCommon,
-      Dependencies.TsecCipher,
-      Dependencies.TsecHash,
-      Dependencies.TsecMac,
-      Dependencies.Test.MUnit,
-      Dependencies.Test.MUnitCatsEffect
+//      Dependencies.TsecCommon,
+//      Dependencies.TsecCipher,
+//      Dependencies.TsecHash,
+//      Dependencies.TsecMac,
+      Dependencies.Test.MUnitCE3,
     )
   )

@@ -16,15 +16,12 @@
 
 package fr.davit.sc4s.security
 
-import cats.effect.IO
-import cats.implicits._
 import fr.davit.sc4s.security.ShannonCipher.ShannonParameterSpec
 import munit.CatsEffectSuite
 import xyz.gianlu.librespot
 
 import java.security.Security
 import java.util.Base64
-import javax.crypto.Cipher
 import javax.crypto.spec.SecretKeySpec
 import scala.util.Random
 
@@ -66,12 +63,8 @@ class ShannonCipherSpec extends CatsEffectSuite {
     val shannon  = new librespot.crypto.Shannon()
     shannon.key(key)
     val expected = encrypt(shannon, 0, testData) ++ mac(shannon)
-    val actual = Shannon
-      .cipher[IO]()
-      .flatTap(c => IO(c.init(Cipher.ENCRYPT_MODE, keySpec)))
-      .flatMap(c => IO(c.update(testData) ++ c.doFinal()))
-      .unsafeRunSync()
-
+    val cipher   = Shannon.cipher(Shannon.Encrypt, keySpec)
+    val actual   = cipher.update(testData) ++ cipher.doFinal()
     assertEquals(actual.toVector, expected.toVector)
   }
 
@@ -80,13 +73,9 @@ class ShannonCipherSpec extends CatsEffectSuite {
     val shannon  = new librespot.crypto.Shannon()
     shannon.key(key)
     val expected = encrypt(shannon, 42, testData) ++ mac(shannon)
-    val actual = Shannon
-      .cipher[IO]()
-      .flatTap(c => IO(c.init(Cipher.ENCRYPT_MODE, keySpec)))
-      .flatTap(c => IO(c.init(Cipher.ENCRYPT_MODE, keySpec, new ShannonParameterSpec(c.getIV, 42))))
-      .flatMap(c => IO(c.update(testData) ++ c.doFinal()))
-      .unsafeRunSync()
-
+    val iv       = Shannon.cipher(Shannon.Encrypt, keySpec).getIV
+    val cipher   = Shannon.cipher(Shannon.Encrypt, keySpec, new ShannonParameterSpec(iv, 42))
+    val actual   = cipher.update(testData) ++ cipher.doFinal()
     assertEquals(actual.toVector, expected.toVector)
   }
 
@@ -96,12 +85,8 @@ class ShannonCipherSpec extends CatsEffectSuite {
     shannon.key(key)
     val expected    = decrypt(shannon, 0, testData)
     val expectedMac = mac(shannon)
-    val actual = Shannon
-      .cipher[IO]()
-      .flatTap(c => IO(c.init(Cipher.DECRYPT_MODE, keySpec)))
-      .flatMap(c => IO(c.update(testData) ++ c.doFinal(expectedMac)))
-      .unsafeRunSync()
-
+    val cipher      = Shannon.cipher(Shannon.Decrypt, keySpec)
+    val actual      = cipher.update(testData) ++ cipher.doFinal(expectedMac)
     assertEquals(actual.toVector, expected.toVector)
   }
 
@@ -111,13 +96,9 @@ class ShannonCipherSpec extends CatsEffectSuite {
     shannon.key(key)
     val expected    = decrypt(shannon, 42, testData)
     val expectedMac = mac(shannon)
-    val actual = Shannon
-      .cipher[IO]()
-      .flatTap(c => IO(c.init(Cipher.DECRYPT_MODE, keySpec)))
-      .flatTap(c => IO(c.init(Cipher.DECRYPT_MODE, keySpec, new ShannonParameterSpec(c.getIV, 42))))
-      .flatMap(c => IO(c.update(testData) ++ c.doFinal(expectedMac)))
-      .unsafeRunSync()
-
+    val iv          = Shannon.cipher(Shannon.Decrypt, keySpec).getIV
+    val cipher      = Shannon.cipher(Shannon.Decrypt, keySpec, new ShannonParameterSpec(iv, 42))
+    val actual      = cipher.update(testData) ++ cipher.doFinal(expectedMac)
     assertEquals(actual.toVector, expected.toVector)
   }
 

@@ -16,8 +16,7 @@
 
 package fr.davit.sc4s.security
 
-import cats.effect._
-import cats.implicits._
+import fr.davit.sc4s.security.ShannonCipher.ShannonParameterSpec
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator
 import org.bouncycastle.crypto.params.KeyParameter
 
@@ -60,46 +59,44 @@ object DiffieHellman {
     }
   }
 
-  def generateKeyPair[F[_]: Sync](): F[(DHPrivateKey, DHPublicKey)] = Sync[F].delay {
+  def generateKeyPair(): (DHPrivateKey, DHPublicKey) = {
     val gen = KeyPairGenerator.getInstance(Algorithm)
     gen.initialize(ParameterSpec)
     val pair = gen.generateKeyPair()
     (pair.getPrivate.asInstanceOf[DHPrivateKey], pair.getPublic.asInstanceOf[DHPublicKey])
   }
 
-  def generatePublicKey[F[_]: Sync](y: BigInt): F[DHPublicKey] = Sync[F].delay {
+  def generatePublicKey(y: BigInt): DHPublicKey = {
     val keySpec = new DHPublicKeySpec(y.bigInteger, Prime.bigInteger, Generator.bigInteger)
     val factory = KeyFactory.getInstance(Algorithm)
     factory.generatePublic(keySpec).asInstanceOf[DHPublicKey]
   }
 
-  def generatePrivateKey[F[_]: Sync](x: BigInt, privateKey: DHPrivateKey): F[DHPublicKey] = Sync[F].delay {
+  def generatePrivateKey(x: BigInt, privateKey: DHPrivateKey): DHPublicKey = {
     val keySpec = new DHPrivateKeySpec(x.bigInteger, privateKey.getX, Prime.bigInteger)
     val factory = KeyFactory.getInstance(Algorithm)
     factory.generatePublic(keySpec).asInstanceOf[DHPublicKey]
   }
 
-  def secret[F[_]: Sync](privateKey: DHPrivateKey, publicKey: DHPublicKey): F[Array[Byte]] =
-    Sync[F].delay {
-      val agreement = KeyAgreement.getInstance(Algorithm)
-      agreement.init(privateKey)
-      agreement.doPhase(publicKey, true)
-      agreement.generateSecret()
-    }
+  def secret(privateKey: DHPrivateKey, publicKey: DHPublicKey): Array[Byte] = {
+    val agreement = KeyAgreement.getInstance(Algorithm)
+    agreement.init(privateKey)
+    agreement.doPhase(publicKey, true)
+    agreement.generateSecret()
+  }
 }
 
 object Sha1 {
   val Algorithm = "SHA1"
 
-  def digest[F[_]: Sync](data: Array[Byte]): F[Array[Byte]] =
-    Sync[F].delay(MessageDigest.getInstance(Algorithm).digest(data))
+  def digest(data: Array[Byte]): Array[Byte] = MessageDigest.getInstance(Algorithm).digest(data)
 }
 
 object HmacSHA1 {
 
   val Algorithm = "HmacSHA1"
 
-  def digest[F[_]: Sync](secretKey: SecretKey, data: Array[Byte]): F[Array[Byte]] = Sync[F].delay {
+  def digest(secretKey: SecretKey, data: Array[Byte]): Array[Byte] = {
     val mac = Mac.getInstance(Algorithm)
     mac.init(secretKey)
     mac.doFinal(data)
@@ -117,20 +114,19 @@ object PBKDF2HmacWithSHA1 {
     override def getEncoded: Array[Byte] = key.clone()
   }
 
-  def generateSecretKey[F[_]: Sync](
+  def generateSecretKey(
       password: Array[Byte],
       salt: Array[Byte],
       iterationCount: Int,
       length: Int
-  ): F[SecretKey] =
-    Sync[F].delay {
-      // user the bouncycastle implementation here
-      // jce implementation only accepts UTF-8 passwords
-      val gen = new PKCS5S2ParametersGenerator()
-      gen.init(password, salt, iterationCount)
-      val key = gen.generateDerivedParameters(length * 8).asInstanceOf[KeyParameter].getKey
-      new PBEKey(key, "HmacSHA1")
-    }
+  ): SecretKey = {
+    // user the bouncycastle implementation here
+    // jce implementation only accepts UTF-8 passwords
+    val gen = new PKCS5S2ParametersGenerator()
+    gen.init(password, salt, iterationCount)
+    val key = gen.generateDerivedParameters(length * 8).asInstanceOf[KeyParameter].getKey
+    new PBEKey(key, "HmacSHA1")
+  }
 }
 
 object AES {
@@ -146,38 +142,35 @@ object AES {
 
   val Transformation = "AES/CTR/NoPadding"
 
-  def decrypt[F[_]: Sync](
+  def decrypt(
       mode: Mode,
       padding: Padding,
       encryptionKey: Key,
       data: Array[Byte]
-  ): F[Array[Byte]] =
-    decrypt[F](mode, padding, encryptionKey, None, data)
+  ): Array[Byte] = decrypt(mode, padding, encryptionKey, None, data)
 
-  def decrypt[F[_]: Sync](
+  def decrypt(
       mode: Mode,
       padding: Padding,
       encryptionKey: Key,
       p: IvParameterSpec,
       data: Array[Byte]
-  ): F[Array[Byte]] =
-    decrypt[F](mode, padding, encryptionKey, Some(p), data)
+  ): Array[Byte] = decrypt(mode, padding, encryptionKey, Some(p), data)
 
-  private def decrypt[F[_]: Sync](
+  private def decrypt(
       mode: Mode,
       padding: Padding,
       encryptionKey: Key,
       params: Option[IvParameterSpec],
       data: Array[Byte]
-  ): F[Array[Byte]] =
-    Sync[F].delay {
-      val cipher = Cipher.getInstance(s"$Algorithm/$mode/$padding")
-      params match {
-        case Some(p) => cipher.init(Cipher.DECRYPT_MODE, encryptionKey, p)
-        case None    => cipher.init(Cipher.DECRYPT_MODE, encryptionKey)
-      }
-      cipher.doFinal(data)
+  ): Array[Byte] = {
+    val cipher = Cipher.getInstance(s"$Algorithm/$mode/$padding")
+    params match {
+      case Some(p) => cipher.init(Cipher.DECRYPT_MODE, encryptionKey, p)
+      case None    => cipher.init(Cipher.DECRYPT_MODE, encryptionKey)
     }
+    cipher.doFinal(data)
+  }
 
 }
 
@@ -185,7 +178,7 @@ object RSA {
 
   val Algorithm = "RSA"
 
-  def generatePublicKey[F[_]: Sync](modulus: BigInt, exponent: BigInt): F[RSAPublicKey] = Sync[F].delay {
+  def generatePublicKey(modulus: BigInt, exponent: BigInt): RSAPublicKey = {
     val keySpec = new RSAPublicKeySpec(modulus.bigInteger, exponent.bigInteger)
     val factory = KeyFactory.getInstance(Algorithm)
     factory.generatePublic(keySpec).asInstanceOf[RSAPublicKey]
@@ -197,25 +190,33 @@ object SHA1withRSA {
 
   val Algorithm = "SHA1withRSA"
 
-  def verifySignature[F[_]: Sync](publicKey: RSAPublicKey, data: Array[Byte], signature: Array[Byte]): F[Unit] =
-    Sync[F]
-      .delay {
-        val sig = Signature.getInstance(Algorithm)
-        sig.initVerify(publicKey)
-        sig.update(data)
-        sig.verify(signature)
-      }
-      .flatMap {
-        case true  => Sync[F].unit
-        case false => Sync[F].raiseError(new GeneralSecurityException("Failed signature check!"))
-      }
+  def verifySignature(publicKey: RSAPublicKey, data: Array[Byte], signature: Array[Byte]): Boolean = {
+    val sig = Signature.getInstance(Algorithm)
+    sig.initVerify(publicKey)
+    sig.update(data)
+    sig.verify(signature)
+  }
 
 }
 
 object Shannon {
 
+  sealed abstract class Mode(private[security] val value: Int)
+  case object Encrypt extends Mode(Cipher.ENCRYPT_MODE)
+  case object Decrypt extends Mode(Cipher.DECRYPT_MODE)
+
   val Algorithm = "Shannon"
 
-  def cipher[F[_]: Sync](): F[Cipher] =
-    Sync[F].delay(Cipher.getInstance(Algorithm))
+  def cipher(mode: Mode, key: Key, params: ShannonParameterSpec): Cipher = cipher(mode, key, Some(params))
+
+  def cipher(mode: Mode, key: Key): Cipher = cipher(mode, key, None)
+
+  private def cipher(mode: Mode, key: Key, params: Option[ShannonParameterSpec]): Cipher = {
+    val cipher = Cipher.getInstance(Algorithm)
+    params match {
+      case Some(p) => cipher.init(mode.value, key, p)
+      case None    => cipher.init(mode.value, key)
+    }
+    cipher
+  }
 }

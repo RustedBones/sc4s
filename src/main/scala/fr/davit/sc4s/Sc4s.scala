@@ -19,7 +19,6 @@ package fr.davit.sc4s
 import cats.Show
 import cats.implicits._
 import cats.effect._
-import cats.effect.concurrent.Ref
 import fr.davit.sc4s.ap.AccessPoint
 import fr.davit.sc4s.security.{DiffieHellman, ShannonCipher}
 import fr.davit.scout.Zeroconf
@@ -31,7 +30,6 @@ import scalapb.GeneratedMessage
 
 import java.net.InetAddress
 import java.security.Security
-import scala.concurrent.duration._
 import scala.util.Random
 
 object Sc4s extends IOApp {
@@ -50,27 +48,25 @@ object Sc4s extends IOApp {
   override def run(args: List[String]): IO[ExitCode] = {
 
     val resources = for {
-      session <- Resource.liftF(Ref.of[IO, Session](Session.Disconnected))
-      ap <- EmberClientBuilder
-        .default[IO]
-        .build
-        .flatMap(c => Resource.liftF(AccessPoint.resolve[IO](c).flatTap(a => IO(println(a)))))
-        .flatMap(addr => AccessPoint.client[IO](addr, Some(5.seconds)))
-      pair <- Resource.liftF(DiffieHellman.generateKeyPair[IO]())
+      session <- Resource
+        .make(Ref.of[IO, Option[Session[IO]]](None))(_.get.flatMap(_.map(_.close()).getOrElse(IO.unit)))
+      client  <- EmberClientBuilder.default[IO].build
+      address <- Resource.eval(AccessPoint.resolve[IO](client).flatTap(a => IO(println(a))))
+      ap      <- AccessPoint.client[IO](address)
+      pair    <- Resource.eval(IO(DiffieHellman.generateKeyPair()))
       (priv, pub) = pair
       service     = Discovery.service(session, ap, DeviceId, priv, pub)
       app         = Router(ZeroconfAppPath -> service).orNotFound
       server <- EmberServerBuilder
         .default[IO]
-        .withHost("0.0.0.0")
+        // .withHost(Host.)
         // .withPort(0)
         .withMaxConcurrency(1) // serve only one client at a time
         .withHttpApp(app)
         .build
-      blocker <- Blocker[IO]
-    } yield (server, ap, blocker)
+    } yield (server, ap)
 
-    resources.use { case (server, _, _) =>
+    resources.use { case (server, _) =>
       val zeroconf = Zeroconf.Instance(
         ZeroconfService,
         "sc4s",

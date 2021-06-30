@@ -17,11 +17,9 @@
 package fr.davit.sc4s
 
 import cats.effect._
-import cats.effect.concurrent.Ref
 import cats.implicits._
-import com.google.protobuf.ByteString
 import fr.davit.sc4s.ap.AccessPoint
-import fr.davit.sc4s.ap.authentication._
+import fr.davit.sc4s.ap.authentication.AuthenticationType
 import fr.davit.sc4s.security._
 import fr.davit.sc4s.security.DiffieHellman._
 import io.circe.literal._
@@ -49,7 +47,9 @@ object Discovery {
     lazy val checksum: Array[Byte]  = blob.takeRight(20)
   }
 
-  implicit private def addUserEntityDecoder[F[_]: Sync]: EntityDecoder[F, AddUser] =
+  private case class Credentials(tpe: AuthenticationType.Recognized, authData: Array[Byte])
+
+  implicit private def addUserEntityDecoder[F[_]: Async]: EntityDecoder[F, AddUser] =
     UrlForm
       .entityDecoder[F]
       .flatMapR { form =>
@@ -76,10 +76,13 @@ object Discovery {
           }
           clientKey <- form.getFirst("clientKey") match {
             case Some(keyStr) if keyStr.nonEmpty =>
-              val key =
-                Sync[F].delay(BigInt(1, Base64.getDecoder.decode(keyStr))).flatMap(DiffieHellman.generatePublicKey[F])
+              val key = for {
+                y <- Sync[F].delay(BigInt(1, Base64.getDecoder.decode(keyStr)))
+                k <- Sync[F].delay(DiffieHellman.generatePublicKey(y))
+              } yield k
               DecodeResult.success(key)
-            case _ => DecodeResult.failureT[F, DHPublicKey](InvalidMessageBodyFailure("Missing clientKey", None))
+            case _ =>
+              DecodeResult.failureT[F, DHPublicKey](InvalidMessageBodyFailure("Missing clientKey", None))
           }
         } yield AddUser(userName, blob, clientKey)
       }
@@ -91,39 +94,37 @@ object Discovery {
       h   <- if (msb) uint(8) else provide(0)
     } yield h << 7 | l).decodeOnly
 
-  private val LoginCredentialsDecoder: scodec.Decoder[LoginCredentials] =
+  private val credentialsDecoder: scodec.Decoder[Credentials] =
     for {
       _          <- ignore(8L)
       ignoreSize <- vuint2L
       _          <- ignore(ignoreSize * 8L)
       _          <- ignore(8L)
-      typ <- vuint2L.map(AuthenticationType.fromValue).emap {
+      tpe <- vuint2L.map(AuthenticationType.fromValue).emap {
         case t: AuthenticationType.Recognized      => Successful(t)
         case AuthenticationType.Unrecognized(code) => Failure(Err(s"Unrecognized AuthenticationType: $code"))
       }
       _        <- ignore(8L)
       dataSize <- vuint2L
-      authData <- bytes(dataSize.toInt).map(_.toArray).map(ByteString.copyFrom)
-    } yield LoginCredentials.defaultInstance
-      .withTyp(typ)
-      .withAuthData(authData)
+      authData <- bytes(dataSize.toInt).map(_.toArray)
+    } yield Credentials(tpe, authData)
 
-  private def decryptBlob[F[_]: Sync](deviceId: String, userName: String, blob: Array[Byte]): F[LoginCredentials] = {
+  private def decryptBlob[F[_]: Sync](deviceId: String, userName: String, blob: Array[Byte]): F[Credentials] = {
     for {
       data     <- Sync[F].delay(Base64.getDecoder.decode(blob))
-      password <- Sha1.digest(deviceId.getBytes)
-      baseKey  <- PBKDF2HmacWithSHA1.generateSecretKey(password, userName.getBytes, 0x100, 20)
-      keyHash  <- Sha1.digest(baseKey.getEncoded)
+      password <- Sync[F].delay(Sha1.digest(deviceId.getBytes))
+      baseKey  <- Sync[F].delay(PBKDF2HmacWithSHA1.generateSecretKey(password, userName.getBytes, 0x100, 20))
+      keyHash  <- Sync[F].delay(Sha1.digest(baseKey.getEncoded))
       keyBytes = ByteVector.view(keyHash) ++ ByteVector.fromInt(keyHash.length)
       key      = new SecretKeySpec(keyBytes.toArray, AES.Algorithm)
-      decrypted <- AES.decrypt(AES.ECB, AES.NoPadding, key, data).map(ByteVector.view)
+      decrypted <- Sync[F].delay(ByteVector.view(AES.decrypt(AES.ECB, AES.NoPadding, key, data)))
       credentialsData = decrypted xor (ByteVector.low(16) ++ decrypted)
-      credentials <- Sync[F].delay(LoginCredentialsDecoder.decode(credentialsData.toBitVector).require.value)
-    } yield credentials.withUsername(userName)
+      credentials <- Sync[F].delay(credentialsDecoder.decode(credentialsData.toBitVector).require.value)
+    } yield credentials
   }
 
-  def service[F[_]: Sync](
-      session: Ref[F, Session],
+  def service[F[_]: Async](
+      session: Ref[F, Option[Session[F]]],
       ap: AccessPoint[F],
       deviceId: String,
       privateKey: DHPrivateKey,
@@ -156,7 +157,7 @@ object Discovery {
                 "remoteName": "sc4s",
                 "publicKey": ${Base64.getEncoder.encodeToString(publicKey.getBytes)},
                 "deviceType": "Unknown",
-                "activeUser": ${s.activeUser}
+                "activeUser": ${s.map(_.userName)}
               }"""
             }
           Ok(result)
@@ -164,9 +165,8 @@ object Discovery {
           request
             .decode[AddUser] { addUser =>
               val result = session.get
-                .map(_.activeUser)
                 .flatMap {
-                  case Some(addUser.userName) =>
+                  case Some(activeSession) if activeSession.userName == addUser.userName =>
                     Sync[F].pure(
                       json"""{
                          "status": 200,
@@ -174,44 +174,53 @@ object Discovery {
                          "spotifyError": 0
                        }"""
                     )
-                  case _ =>
+                  case activeSession =>
                     for {
-                      secret     <- DiffieHellman.secret(privateKey, addUser.clientKey)
-                      secretHash <- Sha1.digest(secret)
+                      secret     <- Sync[F].delay(DiffieHellman.secret(privateKey, addUser.clientKey))
+                      secretHash <- Sync[F].delay(Sha1.digest(secret))
                       secretKey = new SecretKeySpec(secretHash, 0, 16, HmacSHA1.Algorithm)
-                      checksum <- HmacSHA1.digest(secretKey, "checksum".getBytes)
+                      checksum <- Sync[F].delay(HmacSHA1.digest(secretKey, "checksum".getBytes))
                       checksumKey = new SecretKeySpec(checksum, HmacSHA1.Algorithm)
-                      mac <- HmacSHA1.digest(checksumKey, addUser.encrypted)
+                      mac <- Sync[F].delay(HmacSHA1.digest(checksumKey, addUser.encrypted))
                       _ <-
                         if (mac sameElements addUser.checksum) {
                           Sync[F].unit
                         } else {
                           Sync[F].raiseError(new DigestException("Checksum verification failed"))
                         }
-                      encryptionKeyHash <- HmacSHA1.digest(secretKey, "encryption".getBytes)
+                      encryptionKeyHash <- Sync[F].delay(HmacSHA1.digest(secretKey, "encryption".getBytes))
                       encryptionKey = new SecretKeySpec(encryptionKeyHash, 0, 16, AES.Algorithm)
-                      blob        <- AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, addUser.iv, addUser.encrypted)
+                      blob <- Sync[F].delay(
+                        AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, addUser.iv, addUser.encrypted)
+                      )
                       credentials <- decryptBlob(deviceId, addUser.userName, blob)
-                      // TODO save userId -> blob
-                      _ <- ap.authenticate(deviceId, credentials)
-                      _ <- session.set(Session.Connected(addUser.userName))
+                      //                      token <- ap.requestToken(deviceId, Seq("playlist-read"))
+                      //                      _     <- Sync[F].delay(println(token))
+                      //                      _     <- session.set(Session.Connected(addUser.userName))
+                      _ <- activeSession.map(_.close()).getOrElse(Sync[F].unit)
+                      s <- ap.authenticate(
+                        deviceId,
+                        addUser.userName,
+                        credentials.tpe,
+                        credentials.authData,
+                        e => Sync[F].delay(e.printStackTrace()).flatMap(_ => session.set(None))
+                      )
+                      _ <- session.set(Some(s))
                     } yield json"""{
-                              "status": 200,
-                              "statusString": "OK",
-                              "spotifyError": 0
-                            }"""
+                      "status": 200,
+                      "statusString": "OK",
+                      "spotifyError": 0
+                    }"""
                 }
-
               Ok(result)
             }
             .handleErrorWith { e =>
               val result = for {
                 _ <- Sync[F].delay(e.printStackTrace())
-                _ <- session.set(Session.Disconnected)
+                _ <- session.set(None)
               } yield e.getMessage
               InternalServerError(result)
             }
-            .flatTap(res => Sync[F].delay(println(res)))
       }
   }
 }
