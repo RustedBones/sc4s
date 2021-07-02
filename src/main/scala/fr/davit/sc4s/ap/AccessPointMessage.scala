@@ -16,5 +16,43 @@
 
 package fr.davit.sc4s.ap
 
-trait AccessPointMessage
-trait AccessPointLoginMessage extends AccessPointMessage
+import fr.davit.sc4s.ap.authentication.AuthenticationType
+import fr.davit.sc4s.ap.keyexchange.ErrorCode
+import fr.davit.sc4s.ap.mercury.mercury.MercuryHeader
+import scodec.bits.ByteVector
+
+import javax.crypto.interfaces.DHPublicKey
+
+// format: off
+sealed trait AccessPointMessage
+sealed trait AccessPointRequest extends AccessPointMessage
+sealed trait AccessPointResponse extends AccessPointMessage
+
+sealed trait HandshakeMessage
+final case class HandshakeHello(clientKey: DHPublicKey) extends HandshakeMessage with AccessPointRequest
+final case class HandshakeChallenge(serverKey: DHPublicKey) extends HandshakeMessage with AccessPointResponse
+final case class HandshakeResponse(response: Array[Byte]) extends HandshakeMessage with AccessPointRequest
+
+sealed trait AuthenticationMessage
+final case class AuthenticationRequest(deviceId: String, userName: String, tpe: AuthenticationType.Recognized, authData: Array[Byte]) extends AuthenticationMessage with AccessPointRequest
+final case class AuthenticationSuccess(userName: String) extends AuthenticationMessage with AccessPointResponse
+final case class AuthenticationFailure(code: ErrorCode) extends AuthenticationMessage with AccessPointResponse
+
+sealed trait KeepAliveMessage
+final case class Ping(payload: ByteVector) extends KeepAliveMessage with AccessPointResponse
+final case class Pong(payload: ByteVector) extends KeepAliveMessage with AccessPointRequest
+
+sealed trait SessionMessage
+final case class SecretBlock(payload: ByteVector) extends SessionMessage with AccessPointResponse
+final case class LicenseVersion(id: Int, version: String) extends SessionMessage with AccessPointResponse
+final case class CountryCode(code: String) extends SessionMessage with AccessPointResponse
+final case class ProductInfo(info: String) extends SessionMessage with AccessPointResponse
+final case class LegacyWelcome(payload: ByteVector) extends SessionMessage with AccessPointResponse
+final case class Unknown(payload: ByteVector) extends SessionMessage with AccessPointResponse
+
+final case class RawMercuryMessage(sequenceId: Long, header: MercuryHeader, payload: MercuryPayload) extends AccessPointRequest with AccessPointResponse
+final case class MercuryPayload(value: Vector[ByteVector])
+object MercuryPayload {
+  val empty: MercuryPayload = MercuryPayload(Vector.empty)
+}
+// format: on

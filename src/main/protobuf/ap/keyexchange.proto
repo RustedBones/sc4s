@@ -1,11 +1,8 @@
 syntax = "proto2";
 
 option java_package = "fr.davit.sc4s.ap";
-import "scalapb/scalapb.proto";
 
 message ClientHello {
-    option (scalapb.message).extends = "fr.davit.sc4s.ap.AccessPointMessage";
-
     required BuildInfo build_info = 0xa;
     repeated Fingerprint fingerprints_supported = 0x14;
     repeated Cryptosuite cryptosuites_supported = 0x1e;
@@ -97,8 +94,6 @@ message FeatureSet {
 
 
 message APResponseMessage {
-    option (scalapb.message).extends = "fr.davit.sc4s.ap.AccessPointMessage";
-
     optional APChallenge challenge = 0xa;
     optional UpgradeRequiredMessage upgrade = 0x14;
     optional APLoginFailed login_failed = 0x1e;
@@ -171,8 +166,6 @@ message UpgradeRequiredMessage {
 }
 
 message APLoginFailed {
-    option (scalapb.message).extends = "fr.davit.sc4s.ap.AccessPointMessage";
-
     required ErrorCode error_code = 0xa;
     optional int32 retry_delay = 0x14;
     optional int32 expiry = 0x1e;

@@ -16,17 +16,42 @@
 
 package fr.davit.sc4s
 
-sealed trait Session {
-  def activeUser: Option[String]
+import cats.effect._
+import cats.implicits._
+import fr.davit.sc4s.ap.AccessPoint.LoginException
+import fr.davit.sc4s.ap.{AccessPointSocket, AuthenticationFailure, AuthenticationRequest, AuthenticationSuccess}
+import fs2.Stream
+import fs2.io.stdoutLines
+
+trait Session[F[_]] {
+  def userName: String
+  def close(): F[Unit]
 }
 
 object Session {
 
-  case object Disconnected extends Session {
-    override def activeUser: Option[String] = None
-  }
-
-  final case class Connected(userName: String) extends Session {
-    override def activeUser: Option[String] = Some(userName)
+  def apply[F[_]: Async](
+      apSocket: AccessPointSocket[F],
+      login: AuthenticationRequest,
+      errorHandler: Throwable => F[Unit]
+  ): F[Session[F]] = for {
+    switch <- Deferred[F, Unit]
+    server = (Stream.emit(login).through(apSocket.writes()) >> apSocket.reads().head)
+      .flatMap {
+        case _: AuthenticationSuccess =>
+          apSocket
+            .reads()
+            .map(_.toString + "\n")
+            .through(stdoutLines[F, String]())
+        case failure: AuthenticationFailure =>
+          Stream.raiseError[F](new LoginException(failure.code))
+        case response =>
+          Stream.raiseError[F](new Exception(s"Unexpected response $response"))
+      }
+      .interruptWhen(switch.get.attempt)
+    fiber <- Async[F].start(server.compile.drain.onError { case e => errorHandler(e) })
+  } yield new Session[F] {
+    override def userName: String = login.userName
+    override def close(): F[Unit] = switch.complete(()).map(_ => fiber.joinWithNever)
   }
 }
