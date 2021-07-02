@@ -8,7 +8,7 @@ object Dependencies {
     val Http4s       = "1.0.0-M21"
     val MUnitCE3     = "1.0.0"
     val ScalaTest    = "3.2.2"
-    val Scout        = "0.2.0-SNAPSHOT"
+    val Scout        = "1.0.0-M1"
     // val Tsec         = "0.2.1"
   }
 
