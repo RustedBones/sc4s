@@ -3,10 +3,10 @@ import sbt._
 object Dependencies {
 
   object Versions {
-    val BouncyCastle = "1.68"
-    val Circe        = "0.14.0-M6"
-    val Http4s       = "1.0.0-M21"
-    val MUnitCE3     = "1.0.0"
+    val BouncyCastle = "1.69"
+    val Circe        = "0.14.1"
+    val Http4s       = "1.0.0-M23"
+    val MUnitCE3     = "1.0.5"
     val ScalaTest    = "3.2.2"
     val Scout        = "1.0.0-M1"
     // val Tsec         = "0.2.1"
