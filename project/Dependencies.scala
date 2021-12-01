@@ -3,7 +3,7 @@ import sbt._
 object Dependencies {
 
   object Versions {
-    val BouncyCastle = "1.69"
+    val BouncyCastle = "1.70"
     val Circe        = "0.14.1"
     val Http4s       = "1.0.0-M23"
     val MUnitCE3     = "1.0.5"
