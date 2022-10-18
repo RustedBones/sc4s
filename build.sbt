@@ -10,7 +10,7 @@ lazy val filterScalacOptions = { options: Seq[String] =>
 }
 
 // for sbt-github-actions
-ThisBuild / scalaVersion := "2.13.6"
+ThisBuild / scalaVersion := "2.13.10"
 ThisBuild / githubWorkflowBuild := Seq(
   WorkflowStep.Sbt(name = Some("Check project"), commands = List("scalafmtCheckAll", "headerCheckAll")),
   WorkflowStep.Sbt(name = Some("Build project"), commands = List("compile", "test"))
@@ -67,6 +67,6 @@ lazy val `sc4s` = (project in file("."))
 //      Dependencies.TsecCipher,
 //      Dependencies.TsecHash,
 //      Dependencies.TsecMac,
-      Dependencies.Test.MUnitCE3,
+      Dependencies.Test.MUnitCE3
     )
   )
