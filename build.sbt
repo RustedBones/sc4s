@@ -1,3 +1,5 @@
+import scala.annotation.nowarn
+
 // General info
 val username = "RustedBones"
 val repo     = "sc4s"
@@ -40,7 +42,14 @@ lazy val commonSettings =
       ),
       publishMavenStyle := true,
       Test / publishArtifact := false,
-      publishTo := Some(if (isSnapshot.value) Opts.resolver.sonatypeSnapshots else Opts.resolver.sonatypeStaging),
+      publishTo := {
+        val resolver = if (isSnapshot.value) {
+          Opts.resolver.sonatypeSnapshots: @nowarn("cat=deprecation")
+        } else {
+          Opts.resolver.sonatypeStaging
+        }
+        Some(resolver)
+      },
       credentials ++= (for {
         username <- sys.env.get("SONATYPE_USERNAME")
         password <- sys.env.get("SONATYPE_PASSWORD")
@@ -67,6 +76,6 @@ lazy val `sc4s` = (project in file("."))
 //      Dependencies.TsecCipher,
 //      Dependencies.TsecHash,
 //      Dependencies.TsecMac,
-      Dependencies.Test.MUnitCE3,
+      Dependencies.Test.MUnitCE3
     )
   )
