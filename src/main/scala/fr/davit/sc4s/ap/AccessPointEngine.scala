@@ -17,7 +17,7 @@
 package fr.davit.sc4s.ap
 
 import cats.effect.{Ref, Sync}
-import cats.implicits._
+import cats.implicits.*
 import fr.davit.sc4s.security.ShannonCipher.ShannonParameterSpec
 import fr.davit.sc4s.security.{Shannon, ShannonCipher}
 import fs2.Chunk
@@ -29,63 +29,56 @@ import scodec.codecs.{bytes, ignore, uint16}
 import java.security.Key
 import javax.crypto.{BadPaddingException, Cipher, IllegalBlockSizeException}
 
-private[ap] sealed trait AccessPointEngine[F[_]] {
+sealed private[ap] trait AccessPointEngine[F[_]]:
 
   def read(): F[ByteVector]
 
   def write(bytes: ByteVector): F[Unit]
 
-}
-
-private[ap] object AccessPointEngine {
+private[ap] object AccessPointEngine:
 
   val HeaderSize              = 3
   val HeaderCodec: Codec[Int] = ignore(8) ~> uint16
 
-  implicit class CryptCodec[T](val codec: Codec[T]) extends AnyVal {
+  implicit class CryptCodec[T](val codec: Codec[T]) extends AnyVal:
 
-    private def decrypt(cipher: Cipher)(buffer: BitVector): Attempt[BitVector] = {
+    private def decrypt(cipher: Cipher)(buffer: BitVector): Attempt[BitVector] =
       val blocks = buffer.toByteArray
-      try {
-        val decrypted = if (blocks.isEmpty) BitVector.empty else BitVector(cipher.update(blocks))
+      try
+        val decrypted = if blocks.isEmpty then BitVector.empty else BitVector(cipher.update(blocks))
         Attempt.successful(decrypted)
-      } catch {
+      catch
         case e @ (_: IllegalBlockSizeException | _: BadPaddingException) =>
           Attempt.failure(Err("Failed to decrypt: " + e.getMessage))
-      }
-    }
 
-    def decrypted(cipher: Cipher): Decoder[T] = Decoder[T] { buffer: BitVector =>
-      for {
+    def decrypted(cipher: Cipher): Decoder[T] = Decoder[T] { (buffer: BitVector) =>
+      for
         result  <- decrypt(cipher)(buffer)
         message <- codec.decode(result)
-      } yield message
+      yield message
     }
 
-    private def encrypt(cipher: Cipher)(bits: BitVector): Attempt[BitVector] = {
+    private def encrypt(cipher: Cipher)(bits: BitVector): Attempt[BitVector] =
       val blocks = bits.toByteArray
-      try {
-        val encrypted = if (blocks.isEmpty) BitVector.empty else BitVector(cipher.update(blocks))
+      try
+        val encrypted = if blocks.isEmpty then BitVector.empty else BitVector(cipher.update(blocks))
         Attempt.successful(encrypted)
-      } catch {
+      catch
         case _: IllegalBlockSizeException =>
           Attempt.failure(Err(s"Failed to encrypt: invalid block size ${blocks.length}"))
-      }
-    }
 
-    def encrypted(cipher: Cipher): Encoder[T] = Encoder[T] { message: T =>
+    def encrypted(cipher: Cipher): Encoder[T] = Encoder[T] { (message: T) =>
       codec.encode(message).flatMap(encrypt(cipher))
     }
-  }
 
-  def apply[F[_]: Sync](socket: Socket[F], encryptKey: Key, decryptKey: Key): F[AccessPointEngine[F]] = for {
+  def apply[F[_]: Sync](socket: Socket[F], encryptKey: Key, decryptKey: Key): F[AccessPointEngine[F]] = for
     encryptIv    <- Sync[F].delay(Shannon.cipher(Shannon.Encrypt, encryptKey).getIV)
     encryptNonce <- Ref.of[F, Int](0)
     decryptIv    <- Sync[F].delay(Shannon.cipher(Shannon.Decrypt, decryptKey).getIV)
     decryptNonce <- Ref.of[F, Int](0)
-  } yield new AccessPointEngine[F] {
+  yield new AccessPointEngine[F]:
 
-    override def read(): F[ByteVector] = for {
+    override def read(): F[ByteVector] = for
       nonce <- decryptNonce.modify(n => (n + 1, n))
       param = new ShannonParameterSpec(decryptIv, nonce)
       cipher      <- Sync[F].delay(Shannon.cipher(Shannon.Decrypt, decryptKey, param))
@@ -96,16 +89,13 @@ private[ap] object AccessPointEngine {
       payload     <- Sync[F].delay(bytes.decrypted(cipher).decodeValue(payloadRaw.toBitVector).require)
       mac         <- socket.readN(ShannonCipher.BlockSize)
       _           <- Sync[F].delay(cipher.doFinal(mac.toArray))
-    } yield header ++ payload
+    yield header ++ payload
 
-    override def write(message: ByteVector): F[Unit] = for {
+    override def write(message: ByteVector): F[Unit] = for
       nonce <- encryptNonce.modify(n => (n + 1, n))
       param = new ShannonParameterSpec(encryptIv, nonce)
       cipher     <- Sync[F].delay(Shannon.cipher(Shannon.Encrypt, encryptKey, param))
       messageRaw <- Sync[F].delay(bytes.encrypted(cipher).encode(message).require)
       mac        <- Sync[F].delay(ByteVector.view(cipher.doFinal()))
       _          <- socket.write(Chunk.byteVector(messageRaw.toByteVector ++ mac))
-    } yield ()
-  }
-
-}
+    yield ()

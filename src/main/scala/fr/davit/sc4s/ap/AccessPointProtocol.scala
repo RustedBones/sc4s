@@ -17,16 +17,15 @@
 package fr.davit.sc4s.ap
 
 import com.google.protobuf.ByteString
-import fr.davit.sc4s.ap.authentication._
-import fr.davit.sc4s.ap.keyexchange._
+import fr.davit.sc4s.ap.authentication.*
+import fr.davit.sc4s.ap.keyexchange.*
 import fr.davit.sc4s.ap.mercury.mercury.MercuryHeader
-import fr.davit.sc4s.security.DiffieHellman._
+import fr.davit.sc4s.security.DiffieHellman.*
 import fr.davit.sc4s.security.{DiffieHellman, RSA, SHA1withRSA}
 import scalapb.{GeneratedMessage, GeneratedMessageCompanion}
-import scodec.bits.{BuildInfo => _, _}
-import scodec.codecs._
-import scodec.{BuildInfo => _, _}
-import shapeless.{BuildInfo => _, _}
+import scodec.bits.*
+import scodec.codecs.*
+import scodec.*
 
 import scala.util.Random
 
@@ -104,7 +103,7 @@ object AccessPointProtocol {
     val HeaderCodec: Codec[Int]     = uint32.xmap(_.toInt - 4, _ + 4L)
     val InitHeaderCodec: Codec[Int] = (constant(ByteVector(0, 4)) ~> HeaderCodec).xmap(_ - 2, _ + 2)
 
-    implicit val HandshakeHelloEncoder: Encoder[HandshakeHello] = {
+    implicit val HandshakeHelloEncoder: Encoder[HandshakeHello] =
       val payloadEncoder = protobufCodec(ClientHello)
         .contramap[HandshakeHello] { case HandshakeHello(publicKey) =>
           val info = BuildInfo.defaultInstance
@@ -124,9 +123,8 @@ object AccessPointProtocol {
             .withPadding(ByteString.copyFrom(Array(0x1e.toByte)))
         }
       variableSizeBytes(InitHeaderCodec, payloadEncoder.encodeOnly)
-    }
 
-    implicit val HandshakeResponseEncoder: Encoder[HandshakeResponse] = {
+    implicit val HandshakeResponseEncoder: Encoder[HandshakeResponse] =
       val payloadEncoder = protobufCodec(ClientResponsePlaintext)
         .contramap[HandshakeResponse] { case HandshakeResponse(response) =>
           val dhResponse = LoginCryptoDiffieHellmanResponse.defaultInstance
@@ -137,32 +135,27 @@ object AccessPointProtocol {
             .withLoginCryptoResponse(login)
         }
       variableSizeBytes(HeaderCodec, payloadEncoder.encodeOnly)
-    }
 
-    implicit val HandshakeChallengeDecoder: Decoder[HandshakeChallenge] = {
+    implicit val HandshakeChallengeDecoder: Decoder[HandshakeChallenge] =
       val payloadDecoder = protobufCodec(APResponseMessage)
         .emap { apResponseMessage =>
           val challenge       = apResponseMessage.getChallenge.loginCryptoChallenge
           val serverKeyData   = challenge.getDiffieHellman.gs.toByteArray
           val serverSignature = challenge.getDiffieHellman.gsSignature.toByteArray
           val signatureKey    = RSA.generatePublicKey(Modulus, Exponent)
-          if (SHA1withRSA.verifySignature(signatureKey, serverKeyData, serverSignature)) {
+          if SHA1withRSA.verifySignature(signatureKey, serverKeyData, serverSignature) then
             val serverKey = DiffieHellman.generatePublicKey(BigInt(1, serverKeyData))
             Attempt.Successful(HandshakeChallenge(serverKey))
-          } else {
-            Attempt.Failure(Err("Failed signature check!"))
-          }
+          else Attempt.Failure(Err("Failed signature check!"))
         }
       variableSizeBytes(HeaderCodec, payloadDecoder.decodeOnly)
-    }
   }
 
-  object KeepAlive {
+  object KeepAlive:
     val PongEncoder: Encoder[Pong] = bytes.as[Pong]
     val PingDecoder: Decoder[Ping] = bytes.as[Ping]
-  }
 
-  object Authentication {
+  object Authentication:
 
     val AuthenticationRequestEncoder: Encoder[AuthenticationRequest] = protobufCodec(ClientResponseEncrypted)
       .contramap[AuthenticationRequest] { case AuthenticationRequest(deviceId, username, tpe, data) =>
@@ -187,18 +180,16 @@ object AccessPointProtocol {
 
     val AuthenticationFailureDecoder: Decoder[AuthenticationFailure] = protobufCodec(APLoginFailed)
       .map(apLoginFailed => AuthenticationFailure(apLoginFailed.errorCode))
-  }
 
-  object Session {
+  object Session:
     val SecretBockDecoder: Decoder[SecretBlock]        = bytes.as[SecretBlock]
     val LicenseVersionDecoder: Decoder[LicenseVersion] = (int16 :: utf8).as[LicenseVersion]
     val CountryCodeDecoder: Decoder[CountryCode]       = utf8.as[CountryCode]
     val ProductInfoDecoder: Decoder[ProductInfo]       = utf8.as[ProductInfo]
     val LegacyWelcomeDecoder: Decoder[LegacyWelcome]   = bytes.as[LegacyWelcome]
     val UnknownDecoder: Decoder[Unknown]               = bytes.as[Unknown]
-  }
 
-  object Mercury {
+  object Mercury:
     //    private val KeyMasterClientId = "65b708073fc0480ea92a077233ca87bd"
 
     private def mercuryPayloadCodec(size: Int): Codec[MercuryPayload] =
@@ -211,8 +202,8 @@ object AccessPointProtocol {
       require(size == 2 || size == 4 || size == 8, s"expected sequence of 2, 4 or 8 bytes, got $size")
       long(size * 8)
     } { value =>
-      if (value < Short.MaxValue) 2
-      else if (value < Int.MaxValue) 4
+      if value < Short.MaxValue then 2
+      else if value < Int.MaxValue then 4
       else 8
     }
 
@@ -221,9 +212,8 @@ object AccessPointProtocol {
         ("sequenceId" | SequenceIdCodec) ::
           ("flag" | constant(ByteVector.fromByte(1))) ::
           ("parts" | uint16).consume { size =>
-            ("header" | MercuryHeaderCodec) ::
-              ("payload" | mercuryPayloadCodec(size))
-          } { case _ :: payload :: HNil =>
+            ("header" | MercuryHeaderCodec) :: ("payload" | mercuryPayloadCodec(size))
+          } { case (_, payload) =>
             payload.value.size
           }
       ).dropUnits.as[RawMercuryMessage]
@@ -256,5 +246,4 @@ object AccessPointProtocol {
     //        }
     //      }
     //    }
-  }
 }

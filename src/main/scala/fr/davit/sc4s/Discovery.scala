@@ -16,36 +16,35 @@
 
 package fr.davit.sc4s
 
-import cats.effect._
-import cats.implicits._
+import cats.effect.*
+import cats.implicits.*
 import fr.davit.sc4s.ap.AccessPoint
 import fr.davit.sc4s.ap.authentication.AuthenticationType
-import fr.davit.sc4s.security._
-import fr.davit.sc4s.security.DiffieHellman._
-import io.circe.literal._
-import org.http4s._
-import org.http4s.circe._
+import fr.davit.sc4s.security.*
+import fr.davit.sc4s.security.DiffieHellman.*
+import io.circe.literal.*
+import org.http4s.*
+import org.http4s.circe.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.QueryParamDecoderMatcher
 import scodec.Attempt.{Failure, Successful}
 import scodec.Err
-import scodec.bits._
-import scodec.codecs._
+import scodec.bits.*
+import scodec.codecs.*
 
 import java.security.DigestException
 import java.util.Base64
 import javax.crypto.interfaces.{DHPrivateKey, DHPublicKey}
 import javax.crypto.spec.{IvParameterSpec, SecretKeySpec}
 
-object Discovery {
+object Discovery:
 
   private object ActionParam extends QueryParamDecoderMatcher[String]("action")
 
-  private case class AddUser(userName: String, blob: Array[Byte], clientKey: DHPublicKey) {
+  private case class AddUser(userName: String, blob: Array[Byte], clientKey: DHPublicKey):
     lazy val iv: IvParameterSpec    = new IvParameterSpec(blob.take(16))
     lazy val encrypted: Array[Byte] = blob.slice(16, blob.length - 20)
     lazy val checksum: Array[Byte]  = blob.takeRight(20)
-  }
 
   private case class Credentials(tpe: AuthenticationType.Recognized, authData: Array[Byte])
 
@@ -53,49 +52,45 @@ object Discovery {
     UrlForm
       .entityDecoder[F]
       .flatMapR { form =>
-        for {
-          _ <- form.getFirst("action") match {
+        for
+          _ <- form.getFirst("action") match
             case Some("addUser") =>
               DecodeResult.successT[F, Unit](())
             case Some(action) =>
               DecodeResult.failureT[F, Unit](InvalidMessageBodyFailure(s"Unsupported action $action", None))
             case None =>
               DecodeResult.failureT[F, Unit](InvalidMessageBodyFailure("Missing action", None))
-          }
-          userName <- form.getFirst("userName") match {
+          userName <- form.getFirst("userName") match
             case Some(userName) =>
               DecodeResult.successT[F, String](userName)
             case None =>
               DecodeResult.failureT[F, String](InvalidMessageBodyFailure("Missing userName", None))
-          }
-          blob <- form.getFirst("blob") match {
+          blob <- form.getFirst("blob") match
             case Some(blobStr) if blobStr.nonEmpty =>
               DecodeResult.success(Sync[F].delay(Base64.getDecoder.decode(blobStr)))
             case _ =>
               DecodeResult.failureT[F, Array[Byte]](InvalidMessageBodyFailure("Missing blob", None))
-          }
-          clientKey <- form.getFirst("clientKey") match {
+          clientKey <- form.getFirst("clientKey") match
             case Some(keyStr) if keyStr.nonEmpty =>
-              val key = for {
+              val key = for
                 y <- Sync[F].delay(BigInt(1, Base64.getDecoder.decode(keyStr)))
                 k <- Sync[F].delay(DiffieHellman.generatePublicKey(y))
-              } yield k
+              yield k
               DecodeResult.success(key)
             case _ =>
               DecodeResult.failureT[F, DHPublicKey](InvalidMessageBodyFailure("Missing clientKey", None))
-          }
-        } yield AddUser(userName, blob, clientKey)
+        yield AddUser(userName, blob, clientKey)
       }
 
   val vuint2L: scodec.Codec[Int] =
-    (for {
+    (for
       msb <- bool
       l   <- uint(7)
-      h   <- if (msb) uint(8) else provide(0)
-    } yield h << 7 | l).decodeOnly
+      h   <- if msb then uint(8) else provide(0)
+    yield h << 7 | l).decodeOnly
 
   private val credentialsDecoder: scodec.Decoder[Credentials] =
-    for {
+    for
       _          <- ignore(8L)
       ignoreSize <- vuint2L
       _          <- ignore(ignoreSize * 8L)
@@ -107,10 +102,10 @@ object Discovery {
       _        <- ignore(8L)
       dataSize <- vuint2L
       authData <- bytes(dataSize.toInt).map(_.toArray)
-    } yield Credentials(tpe, authData)
+    yield Credentials(tpe, authData)
 
-  private def decryptBlob[F[_]: Sync](deviceId: String, userName: String, blob: Array[Byte]): F[Credentials] = {
-    for {
+  private def decryptBlob[F[_]: Sync](deviceId: String, userName: String, blob: Array[Byte]): F[Credentials] =
+    for
       data     <- Sync[F].delay(Base64.getDecoder.decode(blob))
       password <- Sync[F].delay(Sha1.digest(deviceId.getBytes))
       baseKey  <- Sync[F].delay(PBKDF2HmacWithSHA1.generateSecretKey(password, userName.getBytes, 0x100, 20))
@@ -120,8 +115,7 @@ object Discovery {
       decrypted <- Sync[F].delay(ByteVector.view(AES.decrypt(AES.ECB, AES.NoPadding, key, data)))
       credentialsData = decrypted xor (ByteVector.low(16) ++ decrypted)
       credentials <- Sync[F].delay(credentialsDecoder.decode(credentialsData.toBitVector).require.value)
-    } yield credentials
-  }
+    yield credentials
 
   def service[F[_]: Async](
       session: Ref[F, Option[Session[F]]],
@@ -129,9 +123,9 @@ object Discovery {
       deviceId: String,
       privateKey: DHPrivateKey,
       publicKey: DHPublicKey
-  ): HttpRoutes[F] = {
+  ): HttpRoutes[F] =
     val dsl = Http4sDsl[F]
-    import dsl._
+    import dsl.*
     HttpRoutes
       .of[F] {
         case GET -> Root :? ActionParam("getInfo") =>
@@ -163,7 +157,7 @@ object Discovery {
           Ok(result)
         case request @ POST -> Root =>
           request
-            .decode[AddUser] { addUser =>
+            .decode { (addUser: AddUser) =>
               val result = session.get
                 .flatMap {
                   case Some(activeSession) if activeSession.userName == addUser.userName =>
@@ -175,7 +169,7 @@ object Discovery {
                        }"""
                     )
                   case activeSession =>
-                    for {
+                    for
                       secret     <- Sync[F].delay(DiffieHellman.secret(privateKey, addUser.clientKey))
                       secretHash <- Sync[F].delay(Sha1.digest(secret))
                       secretKey = new SecretKeySpec(secretHash, 0, 16, HmacSHA1.Algorithm)
@@ -183,11 +177,8 @@ object Discovery {
                       checksumKey = new SecretKeySpec(checksum, HmacSHA1.Algorithm)
                       mac <- Sync[F].delay(HmacSHA1.digest(checksumKey, addUser.encrypted))
                       _ <-
-                        if (mac sameElements addUser.checksum) {
-                          Sync[F].unit
-                        } else {
-                          Sync[F].raiseError(new DigestException("Checksum verification failed"))
-                        }
+                        if mac sameElements addUser.checksum then Sync[F].unit
+                        else Sync[F].raiseError(new DigestException("Checksum verification failed"))
                       encryptionKeyHash <- Sync[F].delay(HmacSHA1.digest(secretKey, "encryption".getBytes))
                       encryptionKey = new SecretKeySpec(encryptionKeyHash, 0, 16, AES.Algorithm)
                       blob <- Sync[F].delay(
@@ -206,7 +197,7 @@ object Discovery {
                         e => Sync[F].delay(e.printStackTrace()).flatMap(_ => session.set(None))
                       )
                       _ <- session.set(Some(s))
-                    } yield json"""{
+                    yield json"""{
                       "status": 200,
                       "statusString": "OK",
                       "spotifyError": 0
@@ -215,12 +206,10 @@ object Discovery {
               Ok(result)
             }
             .handleErrorWith { e =>
-              val result = for {
+              val result = for
                 _ <- Sync[F].delay(e.printStackTrace())
                 _ <- session.set(None)
-              } yield e.getMessage
+              yield e.getMessage
               InternalServerError(result)
             }
       }
-  }
-}

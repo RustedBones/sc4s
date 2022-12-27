@@ -22,7 +22,7 @@ import xyz.gianlu.librespot.common.Utils
 
 import java.security.MessageDigest
 
-class CryptoSpec extends CatsEffectSuite {
+class CryptoSpec extends CatsEffectSuite:
 
   test("DiffieHellman should generate secret") {
     val (priv, pub) = DiffieHellman.generateKeyPair()
@@ -40,5 +40,3 @@ class CryptoSpec extends CatsEffectSuite {
     val key      = PBKDF2HmacWithSHA1.generateSecretKey(password, salt, 0x100, 20)
     assertEquals(key.getEncoded.toVector, expected.toVector)
   }
-
-}
