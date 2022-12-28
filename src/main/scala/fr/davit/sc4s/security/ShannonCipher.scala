@@ -275,12 +275,11 @@ class ShannonCipher extends CipherSpi:
         if input(i) != getKeyStreamByte() then throw new AEADBadTagException("Tag mismatch")
       }
       inputLen - BlockSize
-    else {
+    else
       val end = outputOffset + inputLen
       // Put the MAC into the output
       (end until end + BlockSize).foreach { i =>
         output(i) = getKeyStreamByte()
       }
       inputLen + BlockSize
-    }
     size
