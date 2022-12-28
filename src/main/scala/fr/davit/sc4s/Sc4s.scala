@@ -17,14 +17,14 @@
 package fr.davit.sc4s
 
 import cats.Show
-import cats.implicits._
-import cats.effect._
+import cats.implicits.*
+import cats.effect.*
 import fr.davit.sc4s.ap.AccessPoint
 import fr.davit.sc4s.security.{DiffieHellman, ShannonCipher}
 import fr.davit.scout.Zeroconf
 import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.ember.server.EmberServerBuilder
-import org.http4s.implicits._
+import org.http4s.implicits.*
 import org.http4s.server.Router
 import scalapb.GeneratedMessage
 
@@ -32,7 +32,7 @@ import java.net.InetAddress
 import java.security.Security
 import scala.util.Random
 
-object Sc4s extends IOApp {
+object Sc4s extends IOApp:
 
   val ZeroconfAppPath = "/zc/0"
 
@@ -45,9 +45,9 @@ object Sc4s extends IOApp {
 
   Security.addProvider(ShannonCipher.ShannonCipherProvider)
 
-  override def run(args: List[String]): IO[ExitCode] = {
+  override def run(args: List[String]): IO[ExitCode] =
 
-    val resources = for {
+    val resources = for
       session <- Resource
         .make(Ref.of[IO, Option[Session[IO]]](None))(_.get.flatMap(_.map(_.close()).getOrElse(IO.unit)))
       client  <- EmberClientBuilder.default[IO].build
@@ -61,10 +61,10 @@ object Sc4s extends IOApp {
         .default[IO]
         // .withHost(Host.)
         // .withPort(0)
-        .withMaxConcurrency(1) // serve only one client at a time
+        .withMaxConnections(1) // serve only one client at a time
         .withHttpApp(app)
         .build
-    } yield (server, ap)
+    yield (server, ap)
 
     resources.use { case (server, _) =>
       val zeroconf = Zeroconf.Instance(
@@ -75,11 +75,8 @@ object Sc4s extends IOApp {
         Map("VERSION" -> "1.0", "CPath" -> ZeroconfAppPath, "Stack" -> "SP")
       )
 
-      for {
+      for
         _ <- IO(println(s"zc server listening on ${server.baseUri}"))
         _ <- Zeroconf.register[IO](zeroconf).compile.drain
-      } yield ExitCode.Success
+      yield ExitCode.Success
     }
-  }
-
-}

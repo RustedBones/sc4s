@@ -16,23 +16,23 @@
 
 package fr.davit.sc4s.ap
 
-import cats.effect._
-import cats.implicits._
+import cats.effect.*
+import cats.implicits.*
 import com.comcast.ip4s.SocketAddress
 import fr.davit.sc4s.Session
-import fr.davit.sc4s.ap.authentication._
+import fr.davit.sc4s.ap.authentication.*
 import fr.davit.sc4s.ap.keyexchange.ErrorCode
 import fs2.io.net.Network
-import io.circe._
-import org.http4s._
-import org.http4s.circe._
+import io.circe.*
+import org.http4s.*
+import org.http4s.circe.*
 import org.http4s.client.Client
 import scalapb.GeneratedMessage
 
 import java.net.InetSocketAddress
 import scala.util.Random
 
-trait AccessPoint[F[_]] {
+trait AccessPoint[F[_]]:
 
   def authenticate(
       deviceId: String,
@@ -42,9 +42,7 @@ trait AccessPoint[F[_]] {
       errorHandler: Throwable => F[Unit]
   ): F[Session[F]]
 
-}
-
-object AccessPoint {
+object AccessPoint:
 
   type Message = AccessPointMessage with GeneratedMessage
 
@@ -62,25 +60,24 @@ object AccessPoint {
     }
 
   implicit private val ApResolveDecoder: Decoder[ApResolve] =
-    Decoder(_.downField("accesspoint").as[List[InetSocketAddress]].map(ApResolve))
+    Decoder(_.downField("accesspoint").as[List[InetSocketAddress]].map(ApResolve.apply))
 
   implicit private def apResolveEntityDecoder[F[_]: Concurrent]: EntityDecoder[F, ApResolve] =
     jsonOf[F, ApResolve]
 
-  def resolve[F[_]: Async](client: Client[F]): F[InetSocketAddress] = {
+  def resolve[F[_]: Async](client: Client[F]): F[InetSocketAddress] =
     client
       .expect[ApResolve]("http://apresolve.spotify.com?type=accesspoint")
       .map(_.apList)
       .map(Random.shuffle(_))
       .map(_.headOption.getOrElse(DefaultAp))
       .orElse(Sync[F].pure(DefaultAp))
-  }
 
   def client[F[_]: Async: Network](address: InetSocketAddress): Resource[F, AccessPoint[F]] =
-    for {
+    for
       socket   <- Network[F].client(SocketAddress.fromInetSocketAddress(address))
       apSocket <- AccessPointSocket.client(socket)
-    } yield new AccessPoint[F] {
+    yield new AccessPoint[F]:
 
       override def authenticate(
           deviceId: String,
@@ -88,9 +85,6 @@ object AccessPoint {
           tpe: AuthenticationType.Recognized,
           authData: Array[Byte],
           errorHandler: Throwable => F[Unit]
-      ): F[Session[F]] = {
+      ): F[Session[F]] =
         val login = AuthenticationRequest(deviceId, userName, tpe, authData)
         Session(apSocket, login, errorHandler)
-      }
-    }
-}

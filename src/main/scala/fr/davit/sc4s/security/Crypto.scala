@@ -20,10 +20,10 @@ import fr.davit.sc4s.security.ShannonCipher.ShannonParameterSpec
 import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator
 import org.bouncycastle.crypto.params.KeyParameter
 
-import java.security._
+import java.security.*
 import java.security.interfaces.RSAPublicKey
 import java.security.spec.RSAPublicKeySpec
-import javax.crypto._
+import javax.crypto.*
 import javax.crypto.interfaces.{DHPrivateKey, DHPublicKey}
 import javax.crypto.spec.{DHParameterSpec, DHPrivateKeySpec, DHPublicKeySpec, IvParameterSpec}
 
@@ -51,85 +51,72 @@ object DiffieHellman {
   private val KeyLength     = 95
   private val ParameterSpec = new DHParameterSpec(Prime.bigInteger, Generator.bigInteger, KeyLength * 8)
 
-  implicit class RichDHPublicKey(val key: DHPublicKey) extends AnyVal {
+  implicit class RichDHPublicKey(val key: DHPublicKey) extends AnyVal:
 
-    def getBytes: Array[Byte] = {
+    def getBytes: Array[Byte] =
       val bytes = key.getY.toByteArray
-      if (bytes.head == 0) bytes.tail else bytes
-    }
-  }
+      if bytes.head == 0 then bytes.tail else bytes
 
-  def generateKeyPair(): (DHPrivateKey, DHPublicKey) = {
+  def generateKeyPair(): (DHPrivateKey, DHPublicKey) =
     val gen = KeyPairGenerator.getInstance(Algorithm)
     gen.initialize(ParameterSpec)
     val pair = gen.generateKeyPair()
     (pair.getPrivate.asInstanceOf[DHPrivateKey], pair.getPublic.asInstanceOf[DHPublicKey])
-  }
 
-  def generatePublicKey(y: BigInt): DHPublicKey = {
+  def generatePublicKey(y: BigInt): DHPublicKey =
     val keySpec = new DHPublicKeySpec(y.bigInteger, Prime.bigInteger, Generator.bigInteger)
     val factory = KeyFactory.getInstance(Algorithm)
     factory.generatePublic(keySpec).asInstanceOf[DHPublicKey]
-  }
 
-  def generatePrivateKey(x: BigInt, privateKey: DHPrivateKey): DHPublicKey = {
+  def generatePrivateKey(x: BigInt, privateKey: DHPrivateKey): DHPublicKey =
     val keySpec = new DHPrivateKeySpec(x.bigInteger, privateKey.getX, Prime.bigInteger)
     val factory = KeyFactory.getInstance(Algorithm)
     factory.generatePublic(keySpec).asInstanceOf[DHPublicKey]
-  }
 
-  def secret(privateKey: DHPrivateKey, publicKey: DHPublicKey): Array[Byte] = {
+  def secret(privateKey: DHPrivateKey, publicKey: DHPublicKey): Array[Byte] =
     val agreement = KeyAgreement.getInstance(Algorithm)
     agreement.init(privateKey)
     agreement.doPhase(publicKey, true)
     agreement.generateSecret()
-  }
 }
 
-object Sha1 {
+object Sha1:
   val Algorithm = "SHA1"
 
   def digest(data: Array[Byte]): Array[Byte] = MessageDigest.getInstance(Algorithm).digest(data)
-}
 
-object HmacSHA1 {
+object HmacSHA1:
 
   val Algorithm = "HmacSHA1"
 
-  def digest(secretKey: SecretKey, data: Array[Byte]): Array[Byte] = {
+  def digest(secretKey: SecretKey, data: Array[Byte]): Array[Byte] =
     val mac = Mac.getInstance(Algorithm)
     mac.init(secretKey)
     mac.doFinal(data)
-  }
 
-}
-
-object PBKDF2HmacWithSHA1 {
+object PBKDF2HmacWithSHA1:
 
   val Algorithm = "PBKDF2WithHmacSHA1"
 
-  private class PBEKey(key: Array[Byte], algo: String) extends SecretKey {
+  private class PBEKey(key: Array[Byte], algo: String) extends SecretKey:
     override def getAlgorithm: String    = algo
     override def getFormat: String       = "RAW"
     override def getEncoded: Array[Byte] = key.clone()
-  }
 
   def generateSecretKey(
       password: Array[Byte],
       salt: Array[Byte],
       iterationCount: Int,
       length: Int
-  ): SecretKey = {
+  ): SecretKey =
     // user the bouncycastle implementation here
     // jce implementation only accepts UTF-8 passwords
     val gen = new PKCS5S2ParametersGenerator()
     gen.init(password, salt, iterationCount)
     val key = gen.generateDerivedParameters(length * 8).asInstanceOf[KeyParameter].getKey
     new PBEKey(key, "HmacSHA1")
-  }
-}
 
-object AES {
+object AES:
 
   val Algorithm = "AES"
 
@@ -163,43 +150,33 @@ object AES {
       encryptionKey: Key,
       params: Option[IvParameterSpec],
       data: Array[Byte]
-  ): Array[Byte] = {
+  ): Array[Byte] =
     val cipher = Cipher.getInstance(s"$Algorithm/$mode/$padding")
-    params match {
+    params match
       case Some(p) => cipher.init(Cipher.DECRYPT_MODE, encryptionKey, p)
       case None    => cipher.init(Cipher.DECRYPT_MODE, encryptionKey)
-    }
     cipher.doFinal(data)
-  }
 
-}
-
-object RSA {
+object RSA:
 
   val Algorithm = "RSA"
 
-  def generatePublicKey(modulus: BigInt, exponent: BigInt): RSAPublicKey = {
+  def generatePublicKey(modulus: BigInt, exponent: BigInt): RSAPublicKey =
     val keySpec = new RSAPublicKeySpec(modulus.bigInteger, exponent.bigInteger)
     val factory = KeyFactory.getInstance(Algorithm)
     factory.generatePublic(keySpec).asInstanceOf[RSAPublicKey]
-  }
 
-}
-
-object SHA1withRSA {
+object SHA1withRSA:
 
   val Algorithm = "SHA1withRSA"
 
-  def verifySignature(publicKey: RSAPublicKey, data: Array[Byte], signature: Array[Byte]): Boolean = {
+  def verifySignature(publicKey: RSAPublicKey, data: Array[Byte], signature: Array[Byte]): Boolean =
     val sig = Signature.getInstance(Algorithm)
     sig.initVerify(publicKey)
     sig.update(data)
     sig.verify(signature)
-  }
 
-}
-
-object Shannon {
+object Shannon:
 
   sealed abstract class Mode(private[security] val value: Int)
   case object Encrypt extends Mode(Cipher.ENCRYPT_MODE)
@@ -211,12 +188,9 @@ object Shannon {
 
   def cipher(mode: Mode, key: Key): Cipher = cipher(mode, key, None)
 
-  private def cipher(mode: Mode, key: Key, params: Option[ShannonParameterSpec]): Cipher = {
+  private def cipher(mode: Mode, key: Key, params: Option[ShannonParameterSpec]): Cipher =
     val cipher = Cipher.getInstance(Algorithm)
-    params match {
+    params match
       case Some(p) => cipher.init(mode.value, key, p)
       case None    => cipher.init(mode.value, key)
-    }
     cipher
-  }
-}

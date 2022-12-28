@@ -16,25 +16,24 @@
 
 package fr.davit.sc4s
 
-import cats.effect._
-import cats.implicits._
+import cats.effect.*
+import cats.implicits.*
 import fr.davit.sc4s.ap.AccessPoint.LoginException
 import fr.davit.sc4s.ap.{AccessPointSocket, AuthenticationFailure, AuthenticationRequest, AuthenticationSuccess}
 import fs2.Stream
 import fs2.io.stdoutLines
 
-trait Session[F[_]] {
+trait Session[F[_]]:
   def userName: String
   def close(): F[Unit]
-}
 
-object Session {
+object Session:
 
   def apply[F[_]: Async](
       apSocket: AccessPointSocket[F],
       login: AuthenticationRequest,
       errorHandler: Throwable => F[Unit]
-  ): F[Session[F]] = for {
+  ): F[Session[F]] = for
     switch <- Deferred[F, Unit]
     server = (Stream.emit(login).through(apSocket.writes()) >> apSocket.reads().head)
       .flatMap {
@@ -50,8 +49,6 @@ object Session {
       }
       .interruptWhen(switch.get.attempt)
     fiber <- Async[F].start(server.compile.drain.onError { case e => errorHandler(e) })
-  } yield new Session[F] {
+  yield new Session[F]:
     override def userName: String = login.userName
     override def close(): F[Unit] = switch.complete(()).map(_ => fiber.joinWithNever)
-  }
-}

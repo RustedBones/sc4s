@@ -16,18 +16,18 @@
 
 package fr.davit.sc4s.ap
 
-import cats.effect._
-import cats.implicits._
-import fr.davit.sc4s.security._
-import fs2._
+import cats.effect.*
+import cats.implicits.*
+import fr.davit.sc4s.security.*
+import fs2.*
 import fs2.io.net.Socket
-import scodec.bits.{BuildInfo => _, _}
-import scodec.{BuildInfo => _, _}
+import scodec.bits.*
+import scodec.*
 
 import java.security.Key
 import javax.crypto.spec.SecretKeySpec
 
-trait AccessPointSocket[F[_]] {
+trait AccessPointSocket[F[_]]:
 
   def write[T <: AccessPointRequest: Encoder](message: T): F[Unit]
 
@@ -36,13 +36,12 @@ trait AccessPointSocket[F[_]] {
   def writes(): Pipe[F, AccessPointRequest, Unit]
 
   def reads(): Stream[F, AccessPointResponse]
-}
 
-object AccessPointSocket {
+object AccessPointSocket:
 
   def client[F[_]: Sync](
       socket: Socket[F]
-  ): Resource[F, AccessPointSocket[F]] = {
+  ): Resource[F, AccessPointSocket[F]] =
 
     def encode[T](data: T)(implicit encoder: Encoder[T]): F[ByteVector] =
       Sync[F].delay(encoder.encode(data).require.toByteVector)
@@ -50,10 +49,10 @@ object AccessPointSocket {
     def decode[T](bytes: ByteVector)(implicit decoder: Decoder[T]): F[T] =
       Sync[F].delay(decoder.decode(bytes.toBitVector).require.value)
 
-    def handshake(): F[(Key, Key)] = {
-      import AccessPointProtocol.Handshake._
+    def handshake(): F[(Key, Key)] =
+      import AccessPointProtocol.Handshake.*
 
-      for {
+      for
         keyPair <- Sync[F].delay(DiffieHellman.generateKeyPair())
         (priv, pub) = keyPair
         handshakeHelloMessage     <- encode(HandshakeHello(pub))
@@ -77,37 +76,33 @@ object AccessPointSocket {
         answer                   <- Sync[F].delay(HmacSHA1.digest(secretKey, challengeData.toArray))
         handshakeResponseMessage <- encode(HandshakeResponse(answer))
         _                        <- socket.write(Chunk.byteVector(handshakeResponseMessage))
-        // no response expected in case of success
+      // no response expected in case of success
 //        errorSize <- readPayload(4, headerCodec)
 //        error     <- readPayload(errorSize, protobufDecoder(APResponseMessage))
 //        _         <- Sync[F].raiseError[Unit](new HandshakeException(error.loginFailed.get))
-      } yield (encodeKey, decodeKey)
-    }
+      yield (encodeKey, decodeKey)
 
-    val apSocket = for {
+    val apSocket = for
       keys <- handshake()
       (encryptKey, decryptKey) = keys
       engine <- AccessPointEngine(socket, encryptKey, decryptKey)
-    } yield new AccessPointSocket[F] {
+    yield new AccessPointSocket[F]:
 
-      def read[T: Decoder](): F[T] = for {
+      def read[T <: AccessPointResponse: Decoder](): F[T] = for
         payload <- engine.read()
         message <- decode[T](payload)
-      } yield message
+      yield message
 
-      override def write[T: Encoder](message: T): F[Unit] = for {
+      override def write[T <: AccessPointRequest: Encoder](message: T): F[Unit] = for
         payload <- encode(message)
         _       <- engine.write(payload)
-      } yield ()
+      yield ()
 
       override def writes(): Pipe[F, AccessPointRequest, Unit] =
         _.flatMap(req => Stream.eval(write(req)(AccessPointProtocol.AccessPointRequestEncoder)))
 
       override def reads(): Stream[F, AccessPointResponse] =
         Stream.repeatEval(read()(AccessPointProtocol.AccessPointResponseDecoder))
-    }
 
     // TODO is there a close action ?
     Resource.eval(apSocket)
-  }
-}

@@ -17,16 +17,15 @@
 package fr.davit.sc4s.ap
 
 import java.time.Instant
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 // TODO
 sealed trait Scope
 
 case class Token(value: String, scopes: List[String], expiresAt: Instant)
 
-object Token {
+object Token:
   private val ValidityThreshold: FiniteDuration = 10.seconds
 
   def apply(value: String, scopes: Seq[String], expiresIn: FiniteDuration): Token =
     Token(value, scopes.toList, Instant.now().plusSeconds((expiresIn - ValidityThreshold).toSeconds))
-}

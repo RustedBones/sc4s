@@ -25,38 +25,33 @@ import java.util.Base64
 import javax.crypto.spec.SecretKeySpec
 import scala.util.Random
 
-class ShannonCipherSpec extends CatsEffectSuite {
+class ShannonCipherSpec extends CatsEffectSuite:
 
   val key     = Base64.getDecoder.decode("FH+xbCHmV//WI+VGgiLMSBp60HpvaZFlcXF6dv+G0jc=")
   val keySpec = new SecretKeySpec(key, Shannon.Algorithm)
 
-  override def beforeAll(): Unit = {
+  override def beforeAll(): Unit =
     Security.addProvider(ShannonCipher.ShannonCipherProvider)
-  }
 
-  override def afterAll(): Unit = {
+  override def afterAll(): Unit =
     Security.removeProvider(ShannonCipher.ShannonCipherProvider.getName)
-  }
 
-  def encrypt(s: librespot.crypto.Shannon, nonce: Int, data: Array[Byte]): Array[Byte] = {
+  def encrypt(s: librespot.crypto.Shannon, nonce: Int, data: Array[Byte]): Array[Byte] =
     val input = data.clone()
     s.nonce(librespot.common.Utils.toByteArray(nonce))
     s.encrypt(input)
     input
-  }
 
-  def decrypt(s: librespot.crypto.Shannon, nonce: Int, data: Array[Byte]): Array[Byte] = {
+  def decrypt(s: librespot.crypto.Shannon, nonce: Int, data: Array[Byte]): Array[Byte] =
     val input = data.clone()
     s.nonce(librespot.common.Utils.toByteArray(nonce))
     s.decrypt(input)
     input
-  }
 
-  def mac(s: librespot.crypto.Shannon): Array[Byte] = {
+  def mac(s: librespot.crypto.Shannon): Array[Byte] =
     val mac = Array.ofDim[Byte](4)
     s.finish(mac)
     mac
-  }
 
   test("encrypt data") {
     val testData = Random.nextBytes(512)
@@ -101,5 +96,3 @@ class ShannonCipherSpec extends CatsEffectSuite {
     val actual      = cipher.update(testData) ++ cipher.doFinal(expectedMac)
     assertEquals(actual.toVector, expected.toVector)
   }
-
-}

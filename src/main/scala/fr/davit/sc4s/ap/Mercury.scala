@@ -16,13 +16,11 @@
 
 package fr.davit.sc4s.ap
 
-object Mercury {
+object Mercury:
 
   sealed trait Method
-  case object Subscribe extends Method
+  case object Subscribe   extends Method
   case object Unsubscribe extends Method
 
   final case class TokenRequest(sequenceId: Long, deviceId: String, scopes: List[String])
   final case class TokenResponse(sequenceId: Long, token: Token)
-
-}
