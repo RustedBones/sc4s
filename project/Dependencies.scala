@@ -1,15 +1,14 @@
-import sbt._
+import sbt.*
 
-object Dependencies {
+object Dependencies:
 
-  object Versions {
+  object Versions:
     val BouncyCastle = "1.69"
     val Circe        = "0.14.3"
-    val Http4s       = "1.0.0-M37"
+    val Http4s       = "1.0.0-M38"
     val MUnitCE3     = "1.0.7"
     val Scout        = "0.2.0"
     // val Tsec         = "0.2.1"
-  }
 
   val BouncyCastle      = "org.bouncycastle" % "bcprov-jdk15on"      % Versions.BouncyCastle
   val CirceGeneric      = "io.circe"        %% "circe-generic"       % Versions.Circe
@@ -25,11 +24,8 @@ object Dependencies {
 //  val TsecHash          = "io.github.jmcardon" %% "tsec-hash-bouncy"    % Versions.Tsec
 //  val TsecMac           = "io.github.jmcardon" %% "tsec-mac"            % Versions.Tsec
 
-  object Protobuf {
+  object Protobuf:
     val ScalaPb = "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
-  }
 
-  object Test {
+  object Test:
     val MUnitCE3 = "org.typelevel" %% "munit-cats-effect-3" % Versions.MUnitCE3 % "test"
-  }
-}
