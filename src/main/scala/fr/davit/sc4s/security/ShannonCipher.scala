@@ -100,8 +100,6 @@ class ShannonCipher extends CipherSpi:
         val intIv = vectorOfN(provide(16), int32L).decode(ByteVector(p.getIV).toBitVector).require.value.toArray
         (intIv, p.getNonce)
       case Some(p) =>
-        println(p.getClass.getCanonicalName)
-        println(classOf[ShannonParameterSpec].getCanonicalName)
         throw new InvalidAlgorithmParameterException(s"Parameters not supported: $p")
     init(opmode, iv, nonce)
 

@@ -19,7 +19,9 @@ package fr.davit.sc4s
 import cats.Show
 import cats.implicits.*
 import cats.effect.*
-import fr.davit.sc4s.ap.AccessPoint
+import cats.effect.std.Hotswap
+import com.comcast.ip4s.*
+import fr.davit.sc4s.ap.{AccessPoint, Session}
 import fr.davit.sc4s.security.{DiffieHellman, ShannonCipher}
 import fr.davit.scout.Zeroconf
 import org.http4s.ember.client.EmberClientBuilder
@@ -48,25 +50,28 @@ object Sc4s extends IOApp:
   override def run(args: List[String]): IO[ExitCode] =
 
     val resources = for
-      session <- Resource
-        .make(Ref.of[IO, Option[Session[IO]]](None))(_.get.flatMap(_.map(_.close()).getOrElse(IO.unit)))
-      client  <- EmberClientBuilder.default[IO].build
-      address <- Resource.eval(AccessPoint.resolve[IO](client).flatTap(a => IO(println(a))))
-      ap      <- AccessPoint.client[IO](address)
-      pair    <- Resource.eval(IO(DiffieHellman.generateKeyPair()))
-      (priv, pub) = pair
-      service     = Discovery.service(session, ap, DeviceId, priv, pub)
-      app         = Router(ZeroconfAppPath -> service).orNotFound
+      shs    <- Hotswap.create[IO, Session]
+      client <- EmberClientBuilder.default[IO].build
+      app <- Resource.eval {
+        for
+          s    <- shs.swap(Resource.pure(Session.Idle))
+          sr   <- Ref.of[IO, Session](s)
+          keys <- IO(DiffieHellman.generateKeyPair())
+        yield
+          val (priv, pub) = keys
+          val service     = Discovery.service(client, shs, sr, DeviceId, priv, pub)
+          Router(ZeroconfAppPath -> service).orNotFound
+      }
       server <- EmberServerBuilder
         .default[IO]
-        // .withHost(Host.)
-        // .withPort(0)
+        .withHost(ipv4"0.0.0.0")
+        .withPort(port"0")
         .withMaxConnections(1) // serve only one client at a time
         .withHttpApp(app)
         .build
-    yield (server, ap)
+    yield server
 
-    resources.use { case (server, _) =>
+    resources.use { server =>
       val zeroconf = Zeroconf.Instance(
         ZeroconfService,
         "sc4s",

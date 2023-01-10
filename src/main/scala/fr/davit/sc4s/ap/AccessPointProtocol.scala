@@ -17,9 +17,9 @@
 package fr.davit.sc4s.ap
 
 import com.google.protobuf.ByteString
-import fr.davit.sc4s.ap.authentication.*
-import fr.davit.sc4s.ap.keyexchange.*
-import fr.davit.sc4s.ap.mercury.mercury.MercuryHeader
+import com.spotify.authentication.*
+import com.spotify.keyexchange.*
+import com.spotify.mercury.MercuryHeader
 import fr.davit.sc4s.security.DiffieHellman.*
 import fr.davit.sc4s.security.{DiffieHellman, RSA, SHA1withRSA}
 import scalapb.{GeneratedMessage, GeneratedMessageCompanion}
@@ -29,9 +29,9 @@ import scodec.*
 
 import scala.util.Random
 
-object AccessPointProtocol {
+object AccessPointProtocol:
 
-  implicit def protobufCodec[T <: GeneratedMessage](cmp: GeneratedMessageCompanion[T]): Codec[T] =
+  def protobufCodec[T <: GeneratedMessage](cmp: GeneratedMessageCompanion[T]): Codec[T] =
     bytes
       .xmap[Array[Byte]](_.toArray, ByteVector.apply)
       .xmap[T](cmp.parseFrom, cmp.toByteArray)
@@ -63,7 +63,7 @@ object AccessPointProtocol {
     .typecase(hex"0x1f", messageCodec(Session.UnknownDecoder))
     .typecase(hex"0x2b", Mercury.RawMercuryMessageCodec)
 
-  object Handshake {
+  object Handshake:
 
     // format: off
     private val Modulus = BigInt(1, Array[Byte](
@@ -107,9 +107,10 @@ object AccessPointProtocol {
       val payloadEncoder = protobufCodec(ClientHello)
         .contramap[HandshakeHello] { case HandshakeHello(publicKey) =>
           val info = BuildInfo.defaultInstance
-            .withProduct(Product.PRODUCT_PARTNER)
+            .withProduct(Product.PRODUCT_CLIENT)
             .withPlatform(Platform.PLATFORM_LINUX_X86)
-            .withVersion(109800078L)
+            .addProductFlags(ProductFlags.PRODUCT_FLAG_NONE)
+            .withVersion(115800820L)
           val dhHello = LoginCryptoDiffieHellmanHello.defaultInstance
             .withGc(ByteString.copyFrom(publicKey.getBytes))
             .withServerKeysKnown(1)
@@ -149,7 +150,7 @@ object AccessPointProtocol {
           else Attempt.Failure(Err("Failed signature check!"))
         }
       variableSizeBytes(HeaderCodec, payloadDecoder.decodeOnly)
-  }
+  end Handshake
 
   object KeepAlive:
     val PongEncoder: Encoder[Pong] = bytes.as[Pong]
@@ -159,15 +160,16 @@ object AccessPointProtocol {
 
     val AuthenticationRequestEncoder: Encoder[AuthenticationRequest] = protobufCodec(ClientResponseEncrypted)
       .contramap[AuthenticationRequest] { case AuthenticationRequest(deviceId, username, tpe, data) =>
-        val systemInfo = SystemInfo.defaultInstance
-          .withOs(Os.OS_UNKNOWN)
-          .withCpuFamily(CpuFamily.CPU_UNKNOWN)
-          .withDeviceId(deviceId)
-
         val loginCredentials = LoginCredentials.defaultInstance
           .withUsername(username)
           .withTyp(tpe)
           .withAuthData(ByteString.copyFrom(data))
+
+        val systemInfo = SystemInfo.defaultInstance
+          .withOs(Os.OS_UNKNOWN)
+          .withCpuFamily(CpuFamily.CPU_UNKNOWN)
+          .withSystemInformationString("sc4s-0.1.0;Java 11;Linux")
+          .withDeviceId(deviceId)
 
         ClientResponseEncrypted.defaultInstance
           .withLoginCredentials(loginCredentials)
@@ -180,6 +182,7 @@ object AccessPointProtocol {
 
     val AuthenticationFailureDecoder: Decoder[AuthenticationFailure] = protobufCodec(APLoginFailed)
       .map(apLoginFailed => AuthenticationFailure(apLoginFailed.errorCode))
+  end Authentication
 
   object Session:
     val SecretBockDecoder: Decoder[SecretBlock]        = bytes.as[SecretBlock]
@@ -192,8 +195,8 @@ object AccessPointProtocol {
   object Mercury:
     //    private val KeyMasterClientId = "65b708073fc0480ea92a077233ca87bd"
 
-    private def mercuryPayloadCodec(size: Int): Codec[MercuryPayload] =
-      vectorOfN(provide(size), variableSizeBytes(uint16, bytes)).as[MercuryPayload]
+    private def mercuryPayloadCodec(size: Int): Codec[Vector[ByteVector]] =
+      vectorOfN(provide(size), variableSizeBytes(uint16, bytes))
 
     private val MercuryHeaderCodec: Codec[MercuryHeader] =
       variableSizeBytes(uint16, protobufCodec(MercuryHeader))
@@ -207,43 +210,15 @@ object AccessPointProtocol {
       else 8
     }
 
-    val RawMercuryMessageCodec: Codec[RawMercuryMessage] =
+    val RawMercuryMessageCodec: Codec[MercuryMessage] =
       (
         ("sequenceId" | SequenceIdCodec) ::
           ("flag" | constant(ByteVector.fromByte(1))) ::
           ("parts" | uint16).consume { size =>
             ("header" | MercuryHeaderCodec) :: ("payload" | mercuryPayloadCodec(size))
           } { case (_, payload) =>
-            payload.value.size
+            payload.size
           }
-      ).dropUnits.as[RawMercuryMessage]
+      ).dropUnits.as[MercuryMessage]
 
-    //    implicit val TokenRequestEncoder: Encoder[TokenRequest] = RawMercuryMessageCodec
-    //      .contramap[TokenRequest] { case TokenRequest(sequenceId, deviceId, scopes) =>
-    //        val params = Map(
-    //          "scope"     -> scopes.mkString(","),
-    //          "client_id" -> KeyMasterClientId,
-    //          "device_id" -> deviceId
-    //        ).map { case (k, v) => s"$k=$v" }
-    //        val header = MercuryHeader.defaultInstance
-    //          .withUri(s"hm://keymaster/token/authenticated?${params.mkString("&")}")
-    //          .withMethod("GET")
-    //        RawMercuryMessage(sequenceId, header, MercuryPayload.empty)
-    //      }
-    //
-    //    private final case class JsonToken(expiresIn: FiniteDuration, accessToken: String, scopes: List[String])
-    //
-    //    implicit val FiniteDurationDecoder: io.circe.Decoder[FiniteDuration] = io.circe.Decoder.decodeInt.map(_.seconds)
-    //    implicit private val TokenJsonDecoder: io.circe.Decoder[JsonToken]   = io.circe.generic.semiauto.deriveDecoder
-    //
-    //    implicit def tokenResponseDecoder(sequenceId: Long): Decoder[TokenResponse] = {
-    //      string(Charset.forName("UTF-8")).emap { str =>
-    //        io.circe.parser.decode[JsonToken](str) match {
-    //          case Left(err) =>
-    //            Attempt.Failure(Err(err.getMessage))
-    //          case Right(token) =>
-    //            Attempt.Successful(TokenResponse(sequenceId, Token(token.accessToken, token.scopes, token.expiresIn)))
-    //        }
-    //      }
-    //    }
-}
+end AccessPointProtocol

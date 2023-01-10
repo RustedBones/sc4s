@@ -76,6 +76,9 @@ lazy val `sc4s` = (project in file("."))
 //      Dependencies.TsecCipher,
 //      Dependencies.TsecHash,
 //      Dependencies.TsecMac,
-      Dependencies.Test.MUnitCE3
+      Dependencies.Test.Annotations,
+      Dependencies.Test.Gson,
+      Dependencies.Test.MUnitCE3,
+      Dependencies.Test.Slf4jApi,
     )
   )

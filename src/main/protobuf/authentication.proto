@@ -1,6 +1,7 @@
 syntax = "proto2";
 
-option java_package = "fr.davit.sc4s.ap";
+package spotify;
+option java_package = "com.spotify";
 
 message ClientResponseEncrypted {
     required LoginCredentials login_credentials = 0xa;

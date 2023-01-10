@@ -16,9 +16,9 @@
 
 package fr.davit.sc4s.ap
 
-import fr.davit.sc4s.ap.authentication.AuthenticationType
-import fr.davit.sc4s.ap.keyexchange.ErrorCode
-import fr.davit.sc4s.ap.mercury.mercury.MercuryHeader
+import com.spotify.authentication.AuthenticationType
+import com.spotify.keyexchange.ErrorCode
+import com.spotify.mercury.MercuryHeader
 import scodec.bits.ByteVector
 
 import javax.crypto.interfaces.DHPublicKey
@@ -50,9 +50,5 @@ final case class ProductInfo(info: String) extends SessionMessage with AccessPoi
 final case class LegacyWelcome(payload: ByteVector) extends SessionMessage with AccessPointResponse
 final case class Unknown(payload: ByteVector) extends SessionMessage with AccessPointResponse
 
-final case class RawMercuryMessage(sequenceId: Long, header: MercuryHeader, payload: MercuryPayload) extends AccessPointRequest with AccessPointResponse
-final case class MercuryPayload(value: Vector[ByteVector])
-object MercuryPayload {
-  val empty: MercuryPayload = MercuryPayload(Vector.empty)
-}
+final case class MercuryMessage(sequenceId: Long, header: MercuryHeader, payload: Vector[ByteVector]) extends AccessPointRequest with AccessPointResponse
 // format: on

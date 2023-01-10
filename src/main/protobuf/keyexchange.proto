@@ -1,6 +1,7 @@
 syntax = "proto2";
 
-option java_package = "fr.davit.sc4s.ap";
+package spotify;
+option java_package = "com.spotify";
 
 message ClientHello {
     required BuildInfo build_info = 0xa;

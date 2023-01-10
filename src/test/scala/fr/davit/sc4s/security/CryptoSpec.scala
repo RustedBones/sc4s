@@ -28,7 +28,6 @@ class CryptoSpec extends CatsEffectSuite:
     val (priv, pub) = DiffieHellman.generateKeyPair()
     val expected    = Utils.toByteArray(pub.getY.modPow(priv.getX, priv.getParams.getP))
     val secret      = DiffieHellman.secret(priv, pub)
-    println(secret.head)
     assertEquals(secret.toVector, expected.toVector)
   }
 
