@@ -16,14 +16,17 @@
 
 package fr.davit.sc4s
 
+import cats.effect
 import cats.effect.*
+import cats.effect.std.Hotswap
 import cats.implicits.*
-import fr.davit.sc4s.ap.AccessPoint
-import fr.davit.sc4s.ap.authentication.AuthenticationType
+import fr.davit.sc4s.ap.{AccessPoint, Session}
+import com.spotify.authentication.AuthenticationType
 import fr.davit.sc4s.security.*
 import fr.davit.sc4s.security.DiffieHellman.*
 import io.circe.literal.*
 import org.http4s.*
+import org.http4s.client.Client
 import org.http4s.circe.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.QueryParamDecoderMatcher
@@ -32,6 +35,7 @@ import scodec.Err
 import scodec.bits.*
 import scodec.codecs.*
 
+import java.net.InetSocketAddress
 import java.security.DigestException
 import java.util.Base64
 import javax.crypto.interfaces.{DHPrivateKey, DHPublicKey}
@@ -101,25 +105,48 @@ object Discovery:
       }
       _        <- ignore(8L)
       dataSize <- vuint2L
-      authData <- bytes(dataSize.toInt).map(_.toArray)
+      authData <- bytes(dataSize).map(_.toArray)
     yield Credentials(tpe, authData)
 
-  private def decryptBlob[F[_]: Sync](deviceId: String, userName: String, blob: Array[Byte]): F[Credentials] =
-    for
-      data     <- Sync[F].delay(Base64.getDecoder.decode(blob))
-      password <- Sync[F].delay(Sha1.digest(deviceId.getBytes))
-      baseKey  <- Sync[F].delay(PBKDF2HmacWithSHA1.generateSecretKey(password, userName.getBytes, 0x100, 20))
-      keyHash  <- Sync[F].delay(Sha1.digest(baseKey.getEncoded))
-      keyBytes = ByteVector.view(keyHash) ++ ByteVector.fromInt(keyHash.length)
-      key      = new SecretKeySpec(keyBytes.toArray, AES.Algorithm)
-      decrypted <- Sync[F].delay(ByteVector.view(AES.decrypt(AES.ECB, AES.NoPadding, key, data)))
-      credentialsData = decrypted xor (ByteVector.low(16) ++ decrypted)
-      credentials <- Sync[F].delay(credentialsDecoder.decode(credentialsData.toBitVector).require.value)
-    yield credentials
+  private def decryptBlob[F[_]: Sync](
+      privateKey: DHPrivateKey,
+      publicKey: DHPublicKey,
+      iv: IvParameterSpec,
+      checksum: Array[Byte],
+      data: Array[Byte]
+  ): F[Array[Byte]] = Sync[F].delay {
+    val secret       = DiffieHellman.secret(privateKey, publicKey)
+    val secretHash   = Sha1.digest(secret)
+    val secretKey    = new SecretKeySpec(secretHash, 0, 16, HmacSHA1.Algorithm)
+    val checksumHash = HmacSHA1.digest(secretKey, "checksum".getBytes)
+    val checksumKey  = new SecretKeySpec(checksumHash, HmacSHA1.Algorithm)
+    val mac          = HmacSHA1.digest(checksumKey, data)
+    if !mac.sameElements(checksum) then throw new DigestException("Checksum verification failed")
+    val encryptionHash = HmacSHA1.digest(secretKey, "encryption".getBytes)
+    val encryptionKey  = new SecretKeySpec(encryptionHash, 0, 16, AES.Algorithm)
+    AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, iv, data)
+  }
+
+  private def decryptCredentials[F[_]: Sync](
+      deviceId: String,
+      userName: String,
+      blob: Array[Byte]
+  ): F[Credentials] = Sync[F].delay {
+    val data            = Base64.getDecoder.decode(blob)
+    val password        = Sha1.digest(deviceId.getBytes)
+    val baseKey         = PBKDF2HmacWithSHA1.generateSecretKey(password, userName.getBytes, 0x100, 20)
+    val keyHash         = Sha1.digest(baseKey.getEncoded)
+    val keyBytes        = ByteVector.view(keyHash) ++ ByteVector.fromInt(keyHash.length)
+    val key             = new SecretKeySpec(keyBytes.toArray, AES.Algorithm)
+    val decrypted       = ByteVector.view(AES.decrypt(AES.ECB, AES.NoPadding, key, data))
+    val credentialsData = decrypted xor (ByteVector.low(16) ++ decrypted)
+    credentialsDecoder.decode(credentialsData.toBitVector).require.value
+  }
 
   def service[F[_]: Async](
-      session: Ref[F, Option[Session[F]]],
-      ap: AccessPoint[F],
+      client: Client[F],
+      sessionHS: Hotswap[F, Session],
+      sessionR: Ref[F, Session],
       deviceId: String,
       privateKey: DHPrivateKey,
       publicKey: DHPublicKey
@@ -129,86 +156,79 @@ object Discovery:
     HttpRoutes
       .of[F] {
         case GET -> Root :? ActionParam("getInfo") =>
-          val result = session.get
-            .map { s =>
-              json"""{
-                "status": 101,
-                "statusString": "OK",
-                "spotifyError": 0,
-                "version": "2.7.1",
-                "libraryVersion": "0.1.0",
-                "accountReq": "PREMIUM",
-                "brandDisplayName": "sc4s",
-                "modelDisplayName": "sc4s",
-                "voiceSupport": "NO",
-                "availability": "",
-                "productID": 0,
-                "tokenType": "default",
-                "groupStatus": "NONE",
-                "resolverVersion": "0",
-                "scope": "streaming,client-authorization-universal",
-                "deviceID": $deviceId,
-                "remoteName": "sc4s",
-                "publicKey": ${Base64.getEncoder.encodeToString(publicKey.getBytes)},
-                "deviceType": "Unknown",
-                "activeUser": ${s.map(_.userName)}
-              }"""
-            }
+          val result = for
+            session <- sessionR.get
+            userName = session match
+              case Session.Connected(u) => Some(u)
+              case Session.Idle         => None
+          yield json"""{
+              "status": 101,
+              "statusString": "OK",
+              "spotifyError": 0,
+              "version": "2.7.1",
+              "libraryVersion": "0.1.0",
+              "accountReq": "PREMIUM",
+              "brandDisplayName": "sc4s",
+              "modelDisplayName": "sc4s",
+              "voiceSupport": "NO",
+              "availability": "",
+              "productID": 0,
+              "tokenType": "default",
+              "groupStatus": "NONE",
+              "resolverVersion": "0",
+              "scope": "streaming,client-authorization-universal",
+              "deviceID": $deviceId,
+              "remoteName": "sc4s",
+              "publicKey": ${Base64.getEncoder.encodeToString(publicKey.getBytes)},
+              "deviceType": "COMPUTER",
+              "activeUser": $userName
+            }"""
           Ok(result)
         case request @ POST -> Root =>
           request
             .decode { (addUser: AddUser) =>
-              val result = session.get
-                .flatMap {
-                  case Some(activeSession) if activeSession.userName == addUser.userName =>
-                    Sync[F].pure(
-                      json"""{
-                         "status": 200,
-                         "statusString": "OK",
-                         "spotifyError": 0
-                       }"""
-                    )
-                  case activeSession =>
+              val result = for
+                session <- sessionR.get
+                _ <- session match
+                  case Session.Connected(addUser.userName) => Sync[F].unit
+                  case _ =>
                     for
-                      secret     <- Sync[F].delay(DiffieHellman.secret(privateKey, addUser.clientKey))
-                      secretHash <- Sync[F].delay(Sha1.digest(secret))
-                      secretKey = new SecretKeySpec(secretHash, 0, 16, HmacSHA1.Algorithm)
-                      checksum <- Sync[F].delay(HmacSHA1.digest(secretKey, "checksum".getBytes))
-                      checksumKey = new SecretKeySpec(checksum, HmacSHA1.Algorithm)
-                      mac <- Sync[F].delay(HmacSHA1.digest(checksumKey, addUser.encrypted))
-                      _ <-
-                        if mac sameElements addUser.checksum then Sync[F].unit
-                        else Sync[F].raiseError(new DigestException("Checksum verification failed"))
-                      encryptionKeyHash <- Sync[F].delay(HmacSHA1.digest(secretKey, "encryption".getBytes))
-                      encryptionKey = new SecretKeySpec(encryptionKeyHash, 0, 16, AES.Algorithm)
-                      blob <- Sync[F].delay(
-                        AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, addUser.iv, addUser.encrypted)
+                      blob <- decryptBlob(
+                        privateKey,
+                        addUser.clientKey,
+                        addUser.iv,
+                        addUser.checksum,
+                        addUser.encrypted
                       )
-                      credentials <- decryptBlob(deviceId, addUser.userName, blob)
-                      //                      token <- ap.requestToken(deviceId, Seq("playlist-read"))
-                      //                      _     <- Sync[F].delay(println(token))
-                      //                      _     <- session.set(Session.Connected(addUser.userName))
-                      _ <- activeSession.map(_.close()).getOrElse(Sync[F].unit)
-                      s <- ap.authenticate(
+                      credentials <- decryptCredentials(
                         deviceId,
                         addUser.userName,
-                        credentials.tpe,
-                        credentials.authData,
-                        e => Sync[F].delay(e.printStackTrace()).flatMap(_ => session.set(None))
+                        blob
                       )
-                      _ <- session.set(Some(s))
-                    yield json"""{
-                      "status": 200,
-                      "statusString": "OK",
-                      "spotifyError": 0
-                    }"""
-                }
+                      apAddress <- AccessPoint.resolve(client)
+                      _         <- Sync[F].delay(println(s"Connecting to $apAddress"))
+                      newSession <- sessionHS.swap(
+                        AccessPoint.connect(
+                          apAddress,
+                          addUser.userName,
+                          deviceId,
+                          credentials.tpe,
+                          credentials.authData
+                        )
+                      )
+                      _ <- sessionR.set(newSession)
+                    yield ()
+              yield json"""{
+                  "status": 200,
+                  "statusString": "OK",
+                  "spotifyError": 0
+                }"""
               Ok(result)
             }
             .handleErrorWith { e =>
               val result = for
                 _ <- Sync[F].delay(e.printStackTrace())
-                _ <- session.set(None)
+                _ <- sessionHS.swap(Resource.pure(Session.Idle)).flatMap(sessionR.set)
               yield e.getMessage
               InternalServerError(result)
             }

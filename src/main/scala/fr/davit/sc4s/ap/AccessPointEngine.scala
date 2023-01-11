@@ -78,17 +78,25 @@ private[ap] object AccessPointEngine:
     decryptNonce <- Ref.of[F, Int](0)
   yield new AccessPointEngine[F]:
 
+    def readN(numBytes: Int): F[BitVector] =
+      for
+        chunk <- socket.readN(numBytes)
+        _ <-
+          if chunk.size != numBytes then Sync[F].raiseError(new RuntimeException("Connection closed unexpectedly"))
+          else Sync[F].unit
+      yield chunk.toBitVector
+
     override def read(): F[ByteVector] = for
       nonce <- decryptNonce.modify(n => (n + 1, n))
       param = new ShannonParameterSpec(decryptIv, nonce)
       cipher      <- Sync[F].delay(Shannon.cipher(Shannon.Decrypt, decryptKey, param))
-      headerRaw   <- socket.readN(HeaderSize)
-      header      <- Sync[F].delay(bytes.decrypted(cipher).decodeValue(headerRaw.toBitVector).require)
+      headerRaw   <- readN(HeaderSize)
+      header      <- Sync[F].delay(bytes.decrypted(cipher).decodeValue(headerRaw).require)
       payloadSize <- Sync[F].delay(HeaderCodec.decodeValue(header.toBitVector).require)
-      payloadRaw  <- socket.readN(payloadSize)
-      payload     <- Sync[F].delay(bytes.decrypted(cipher).decodeValue(payloadRaw.toBitVector).require)
-      mac         <- socket.readN(ShannonCipher.BlockSize)
-      _           <- Sync[F].delay(cipher.doFinal(mac.toArray))
+      payloadRaw  <- readN(payloadSize)
+      payload     <- Sync[F].delay(bytes.decrypted(cipher).decodeValue(payloadRaw).require)
+      mac         <- readN(ShannonCipher.BlockSize)
+      _           <- Sync[F].delay(cipher.doFinal(mac.toByteArray))
     yield header ++ payload
 
     override def write(message: ByteVector): F[Unit] = for
