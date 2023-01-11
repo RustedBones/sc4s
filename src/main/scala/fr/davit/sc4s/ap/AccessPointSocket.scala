@@ -72,37 +72,34 @@ object AccessPointSocket:
         }
         secretKey = new SecretKeySpec(data, 0, 20, HmacSHA1.Algorithm)
         encodeKey = new SecretKeySpec(data, 20, 32, Shannon.Algorithm)
-        decodeKey = new SecretKeySpec(data, 52, 32, Shannon.Algorithm)
+        decodeKey = new SecretKeySpec(data, (20 + 32), 32, Shannon.Algorithm)
         answer                   <- Sync[F].delay(HmacSHA1.digest(secretKey, challengeData.toArray))
         handshakeResponseMessage <- encode(HandshakeResponse(answer))
         _                        <- socket.write(Chunk.byteVector(handshakeResponseMessage))
-      // no response expected in case of success
-//        errorSize <- readPayload(4, headerCodec)
-//        error     <- readPayload(errorSize, protobufDecoder(APResponseMessage))
-//        _         <- Sync[F].raiseError[Unit](new HandshakeException(error.loginFailed.get))
       yield (encodeKey, decodeKey)
 
-    val apSocket = for
-      keys <- handshake()
-      (encryptKey, decryptKey) = keys
-      engine <- AccessPointEngine(socket, encryptKey, decryptKey)
-    yield new AccessPointSocket[F]:
+    Resource.eval {
+      for
+        keys <- handshake()
+        (encryptKey, decryptKey) = keys
+        engine <- AccessPointEngine(socket, encryptKey, decryptKey)
+      yield new AccessPointSocket[F]:
 
-      def read[T <: AccessPointResponse: Decoder](): F[T] = for
-        payload <- engine.read()
-        message <- decode[T](payload)
-      yield message
+        def read[T <: AccessPointResponse: Decoder](): F[T] = for
+          payload <- engine.read()
+          message <- decode[T](payload)
+          _       <- Sync[F].delay(println(message))
+        yield message
 
-      override def write[T <: AccessPointRequest: Encoder](message: T): F[Unit] = for
-        payload <- encode(message)
-        _       <- engine.write(payload)
-      yield ()
+        override def write[T <: AccessPointRequest: Encoder](message: T): F[Unit] = for
+          _       <- Sync[F].delay(println(message))
+          payload <- encode(message)
+          _       <- engine.write(payload)
+        yield ()
 
-      override def writes(): Pipe[F, AccessPointRequest, Unit] =
-        _.flatMap(req => Stream.eval(write(req)(AccessPointProtocol.AccessPointRequestEncoder)))
+        override def writes(): Pipe[F, AccessPointRequest, Unit] =
+          _.flatMap(req => Stream.eval(write(req)(AccessPointProtocol.AccessPointRequestEncoder)))
 
-      override def reads(): Stream[F, AccessPointResponse] =
-        Stream.repeatEval(read()(AccessPointProtocol.AccessPointResponseDecoder))
-
-    // TODO is there a close action ?
-    Resource.eval(apSocket)
+        override def reads(): Stream[F, AccessPointResponse] =
+          Stream.repeatEval(read()(AccessPointProtocol.AccessPointResponseDecoder))
+    }

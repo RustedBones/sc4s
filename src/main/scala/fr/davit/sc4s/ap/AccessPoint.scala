@@ -19,9 +19,8 @@ package fr.davit.sc4s.ap
 import cats.effect.*
 import cats.implicits.*
 import com.comcast.ip4s.SocketAddress
-import fr.davit.sc4s.Session
-import fr.davit.sc4s.ap.authentication.*
-import fr.davit.sc4s.ap.keyexchange.ErrorCode
+import com.spotify.authentication.*
+import com.spotify.keyexchange.ErrorCode
 import fs2.io.net.Network
 import io.circe.*
 import org.http4s.*
@@ -32,15 +31,9 @@ import scalapb.GeneratedMessage
 import java.net.InetSocketAddress
 import scala.util.Random
 
-trait AccessPoint[F[_]]:
-
-  def authenticate(
-      deviceId: String,
-      userName: String,
-      tpe: AuthenticationType.Recognized,
-      authData: Array[Byte],
-      errorHandler: Throwable => F[Unit]
-  ): F[Session[F]]
+enum Session:
+  case Connected(userName: String)
+  case Idle
 
 object AccessPoint:
 
@@ -73,18 +66,35 @@ object AccessPoint:
       .map(_.headOption.getOrElse(DefaultAp))
       .orElse(Sync[F].pure(DefaultAp))
 
-  def client[F[_]: Async: Network](address: InetSocketAddress): Resource[F, AccessPoint[F]] =
-    for
+  def connect[F[_]: Async](
+      address: InetSocketAddress,
+      deviceId: String,
+      userName: String,
+      tpe: AuthenticationType.Recognized,
+      authData: Array[Byte]
+  ): Resource[F, Session] = Resource.make {
+    val login = AuthenticationRequest(deviceId, userName, tpe, authData)
+    val accessPoint = for
       socket   <- Network[F].client(SocketAddress.fromInetSocketAddress(address))
       apSocket <- AccessPointSocket.client(socket)
-    yield new AccessPoint[F]:
+    yield apSocket
 
-      override def authenticate(
-          deviceId: String,
-          userName: String,
-          tpe: AuthenticationType.Recognized,
-          authData: Array[Byte],
-          errorHandler: Throwable => F[Unit]
-      ): F[Session[F]] =
-        val login = AuthenticationRequest(deviceId, userName, tpe, authData)
-        Session(apSocket, login, errorHandler)
+    accessPoint.use { ap =>
+      for
+        _      <- ap.write(login)(AccessPointProtocol.AccessPointRequestEncoder)
+        result <- ap.read()(AccessPointProtocol.AccessPointResponseDecoder)
+        _ <- result match
+          case _: AuthenticationSuccess =>
+            Sync[F].unit
+          //       val listen = apSocket.reads().through(topic.publish)
+          //       val write  = Stream.fromQueueUnterminated(queue).through(apSocket.writes())
+          //       listen.concurrently(write)
+          case failure: AuthenticationFailure =>
+            Sync[F].raiseError(new LoginException(failure.code))
+          case response =>
+            Sync[F].raiseError(new Exception(s"Unexpected response $response"))
+      yield Session.Connected(userName)
+    }
+  } { session =>
+    Sync[F].unit
+  }
