@@ -38,30 +38,33 @@ object AccessPointProtocol:
 
   val MessageSizeCodec: Codec[Int] = uint16
 
-  private def messageCodec[T](encoder: Encoder[T]): Codec[T] =
-    variableSizeBytes(MessageSizeCodec, encoder.encodeOnly)
-
-  private def messageCodec[T](decoder: Decoder[T]): Codec[T] =
-    variableSizeBytes(MessageSizeCodec, decoder.decodeOnly)
+  private def messageCodec[T](codec: Codec[T]): Codec[T] =
+    variableSizeBytes(MessageSizeCodec, codec)
 
   val AccessPointRequestEncoder: Encoder[AccessPointRequest] = discriminated[AccessPointRequest]
     .by(bytes(1))
-    .typecase(hex"0xab", messageCodec(Authentication.AuthenticationRequestEncoder))
-    .typecase(hex"0x49", messageCodec(KeepAlive.PongEncoder))
-    .typecase(hex"0x2b", Mercury.RawMercuryMessageCodec)
+    .typecase(hex"0xab", messageCodec(Authentication.AuthenticationRequestEncoder.encodeOnly))
+    .typecase(hex"0x49", messageCodec(KeepAlive.PongEncoder.encodeOnly))
+    .typecase(hex"0xb2", messageCodec(Mercury.RawMercuryMessageCodec)) // MercuryReq
+    .typecase(hex"0xb3", messageCodec(Mercury.RawMercuryMessageCodec)) // MercurySub
+    .typecase(hex"0xb4", messageCodec(Mercury.RawMercuryMessageCodec)) // MercuryUnsub
+    .typecase(hex"0xb5", messageCodec(Mercury.RawMercuryMessageCodec)) // MercuryEvent
 
   val AccessPointResponseDecoder: Decoder[AccessPointResponse] = discriminated[AccessPointResponse]
     .by(bytes(1))
-    .typecase(hex"0xac", messageCodec(Authentication.AuthenticationSuccessDecoder))
-    .typecase(hex"0xad", messageCodec(Authentication.AuthenticationFailureDecoder))
-    .typecase(hex"0x04", messageCodec(KeepAlive.PingDecoder))
-    .typecase(hex"0x02", messageCodec(Session.SecretBockDecoder))
-    .typecase(hex"0x76", messageCodec(Session.LicenseVersionDecoder))
-    .typecase(hex"0x1b", messageCodec(Session.CountryCodeDecoder))
-    .typecase(hex"0x50", messageCodec(Session.ProductInfoDecoder))
-    .typecase(hex"0x69", messageCodec(Session.LegacyWelcomeDecoder))
-    .typecase(hex"0x1f", messageCodec(Session.UnknownDecoder))
-    .typecase(hex"0x2b", Mercury.RawMercuryMessageCodec)
+    .typecase(hex"0xac", messageCodec(Authentication.AuthenticationSuccessDecoder.decodeOnly))
+    .typecase(hex"0xad", messageCodec(Authentication.AuthenticationFailureDecoder.decodeOnly))
+    .typecase(hex"0x04", messageCodec(KeepAlive.PingDecoder.decodeOnly))
+    .typecase(hex"0x02", messageCodec(Session.SecretBockDecoder.decodeOnly))
+    .typecase(hex"0x76", messageCodec(Session.LicenseVersionDecoder.decodeOnly))
+    .typecase(hex"0x1b", messageCodec(Session.CountryCodeDecoder.decodeOnly))
+    .typecase(hex"0x50", messageCodec(Session.ProductInfoDecoder.decodeOnly))
+    .typecase(hex"0x69", messageCodec(Session.LegacyWelcomeDecoder.decodeOnly))
+    .typecase(hex"0x1f", messageCodec(Session.UnknownDecoder.decodeOnly))
+    .typecase(hex"0xb2", messageCodec(Mercury.RawMercuryMessageCodec)) // MercuryReq
+    .typecase(hex"0xb3", messageCodec(Mercury.RawMercuryMessageCodec)) // MercurySub
+    .typecase(hex"0xb4", messageCodec(Mercury.RawMercuryMessageCodec)) // MercuryUnsub
+    .typecase(hex"0xb5", messageCodec(Mercury.RawMercuryMessageCodec)) // MercuryEvent
 
   object Handshake:
 
@@ -213,9 +216,10 @@ object AccessPointProtocol:
     val RawMercuryMessageCodec: Codec[MercuryMessage] =
       (
         ("sequenceId" | SequenceIdCodec) ::
-          ("flag" | constant(ByteVector.fromByte(1))) ::
+          ("flag" | constant(ByteVector.fromByte(1))) :: // TODO
           ("parts" | uint16).consume { size =>
-            ("header" | MercuryHeaderCodec) :: ("payload" | mercuryPayloadCodec(size))
+            // 1st part is the header, rest is payload
+            ("header" | MercuryHeaderCodec) :: ("payload" | mercuryPayloadCodec(size - 1))
           } { case (_, payload) =>
             payload.size
           }

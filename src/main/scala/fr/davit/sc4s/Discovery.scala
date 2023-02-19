@@ -18,7 +18,7 @@ package fr.davit.sc4s
 
 import cats.effect
 import cats.effect.*
-import cats.effect.std.Hotswap
+import cats.effect.std.{Hotswap, Mutex}
 import cats.implicits.*
 import fr.davit.sc4s.ap.{AccessPoint, Session}
 import com.spotify.authentication.AuthenticationType
@@ -144,6 +144,7 @@ object Discovery:
   }
 
   def service[F[_]: Async](
+      mutex: Mutex[F],
       client: Client[F],
       sessionHS: Hotswap[F, Session],
       sessionR: Ref[F, Session],
@@ -185,51 +186,51 @@ object Discovery:
             }"""
           Ok(result)
         case request @ POST -> Root =>
-          request
-            .decode { (addUser: AddUser) =>
-              val result = for
-                session <- sessionR.get
-                _ <- session match
-                  case Session.Connected(addUser.userName) => Sync[F].unit
-                  case _ =>
-                    for
-                      blob <- decryptBlob(
-                        privateKey,
-                        addUser.clientKey,
-                        addUser.iv,
-                        addUser.checksum,
-                        addUser.encrypted
-                      )
-                      credentials <- decryptCredentials(
-                        deviceId,
-                        addUser.userName,
-                        blob
-                      )
-                      apAddress <- AccessPoint.resolve(client)
-                      _         <- Sync[F].delay(println(s"Connecting to $apAddress"))
-                      newSession <- sessionHS.swap(
-                        AccessPoint.connect(
-                          apAddress,
-                          addUser.userName,
-                          deviceId,
-                          credentials.tpe,
-                          credentials.authData
+          mutex.lock.surround {
+            request
+              .decode { (addUser: AddUser) =>
+                val result = for
+                  session <- sessionR.get
+                  _ <- session match
+                    case Session.Connected(addUser.userName) => Sync[F].unit
+                    case _ =>
+                      for
+                        blob <- decryptBlob(
+                          privateKey,
+                          addUser.clientKey,
+                          addUser.iv,
+                          addUser.checksum,
+                          addUser.encrypted
                         )
-                      )
-                      _ <- sessionR.set(newSession)
-                    yield ()
-              yield json"""{
+                        credentials <- decryptCredentials(
+                          deviceId,
+                          addUser.userName,
+                          blob
+                        )
+                        newSession <- sessionHS.swap(
+                          AccessPoint.connect(
+                            client,
+                            addUser.userName,
+                            deviceId,
+                            credentials.tpe,
+                            credentials.authData
+                          )
+                        )
+                        _ <- sessionR.set(newSession)
+                      yield ()
+                yield json"""{
                   "status": 200,
                   "statusString": "OK",
                   "spotifyError": 0
                 }"""
-              Ok(result)
-            }
-            .handleErrorWith { e =>
-              val result = for
-                _ <- Sync[F].delay(e.printStackTrace())
-                _ <- sessionHS.swap(Resource.pure(Session.Idle)).flatMap(sessionR.set)
-              yield e.getMessage
-              InternalServerError(result)
-            }
+                Ok(result)
+              }
+              .handleErrorWith { e =>
+                val result = for
+                  _ <- Sync[F].delay(e.printStackTrace())
+                  _ <- sessionHS.swap(Resource.pure(Session.Idle)).flatMap(sessionR.set)
+                yield e.getMessage
+                InternalServerError(result)
+              }
+          }
       }
