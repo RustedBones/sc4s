@@ -23,8 +23,7 @@ import cats.implicits.*
 import com.comcast.ip4s.{IpAddress, SocketAddress}
 import com.spotify.authentication.*
 import com.spotify.keyexchange.ErrorCode
-import fr.davit.sc4s.Mercury
-import fr.davit.sc4s.TokenProvider
+import fr.davit.sc4s.{KeepAlive, Mercury, TokenProvider}
 import fs2.io.net.Network
 import fs2.Stream
 import fs2.concurrent.Topic
@@ -101,22 +100,15 @@ object AccessPoint:
         response match
           case _: AuthenticationSuccess =>
             for
-              queue <- Queue.bounded[F, AccessPointRequest](60)
               topic <- Topic[F, AccessPointResponse]
-            yield (queue, topic)
+              queue <- Queue.bounded[F, AccessPointRequest](60)
+            yield (topic, queue)
           case failure: AuthenticationFailure =>
             Sync[F].raiseError(new LoginException(failure.code))
           case response =>
             Sync[F].raiseError(new Exception(s"Unexpected response $response"))
       }
-      (out, in) = io
-      // write loop
-      _ <- Stream
-        .fromQueueUnterminated(out)
-        .through(ap.writes())
-        .compile
-        .drain
-        .background
+      (in, out) = io
       // read loop
       _ <- ap
         .reads()
@@ -124,9 +116,17 @@ object AccessPoint:
         .compile
         .drain
         .background
-      mercury <- Mercury.client[F](out, in)
+      // write loop
+      _ <- Stream
+        .fromQueueUnterminated(out)
+        .through(ap.writes())
+        .compile
+        .drain
+        .background
+      _ <- KeepAlive.client(in, out)
+      mercury <- Mercury.client[F](in, out)
       tokenProvider = TokenProvider(deviceId, mercury)
-      _       <- dealer(client, tokenProvider)
+      _ <- dealer(client, tokenProvider)
     yield Session.Connected(userName)
   end connect
 

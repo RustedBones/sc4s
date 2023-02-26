@@ -40,6 +40,7 @@ final case class AuthenticationFailure(code: ErrorCode) extends AuthenticationMe
 
 sealed trait KeepAliveMessage
 final case class Ping(payload: ByteVector) extends KeepAliveMessage with AccessPointResponse
+object PongAck extends KeepAliveMessage with AccessPointResponse
 final case class Pong(payload: ByteVector) extends KeepAliveMessage with AccessPointRequest
 
 sealed trait SessionMessage
