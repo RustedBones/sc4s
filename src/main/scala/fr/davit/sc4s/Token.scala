@@ -22,7 +22,6 @@ import scala.concurrent.duration.*
 enum Scope(val value: String):
   case PlaylistRead extends Scope("playlist-read")
 
-
 case class Token(value: String, scopes: List[Scope], expiresAt: Instant)
 
 object Token:

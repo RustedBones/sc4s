@@ -123,7 +123,7 @@ object AccessPoint:
         .compile
         .drain
         .background
-      _ <- KeepAlive.client(in, out)
+      _       <- KeepAlive.client(in, out)
       mercury <- Mercury.client[F](in, out)
       tokenProvider = TokenProvider(deviceId, mercury)
       _ <- dealer(client, tokenProvider)

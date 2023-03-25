@@ -3,6 +3,7 @@ package fr.davit.sc4s
 import cats.effect.Sync
 import cats.implicits.*
 import com.spotify.mercury.MercuryHeader
+import fr.davit.sc4s.ap.MercuryRequest
 import scodec.{Attempt, Decoder, Err}
 import scodec.codecs.utf8
 import org.http4s.implicits.*
@@ -37,10 +38,7 @@ object TokenProvider:
         .withQueryParam("client_id", KeyMasterClientId)
         .withQueryParam("device_id", deviceId)
 
-      val header = MercuryHeader.defaultInstance
-        .withUri(uri.renderString)
-        .withMethod("GET")
-      val request = Mercury.Message(header, Vector.empty)
+      val request = Mercury.Request(uri)
 
       for
         response <- mercury.send(request)
