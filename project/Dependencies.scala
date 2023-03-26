@@ -5,7 +5,7 @@ object Dependencies {
   object Versions {
     val Annotations  = "16.0.2"
     val BouncyCastle = "1.69"
-    val Circe        = "0.14.3"
+    val Circe        = "0.14.5"
     val Gson         = "2.9.0"
     val Http4s       = "1.0.0-M38"
     val Http4sJdk    = "1.0.0-M8"
