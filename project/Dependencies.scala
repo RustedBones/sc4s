@@ -8,7 +8,7 @@ object Dependencies {
     val Circe        = "0.14.3"
     val Gson         = "2.9.0"
     val Http4s       = "1.0.0-M38"
-    val Http4sJdk    = "1.0.0-M8"
+    val Http4sJdk    = "1.0.0-M9"
     val MUnitCE3     = "1.0.7"
     val Scout        = "0.2.1"
     val Slf4j        = "2.0.6"
