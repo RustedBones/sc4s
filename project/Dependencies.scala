@@ -1,17 +1,18 @@
-import sbt.*
+import sbt._
 
-object Dependencies:
+object Dependencies {
 
-  object Versions:
+  object Versions {
     val Annotations  = "16.0.2"
     val BouncyCastle = "1.69"
     val Circe        = "0.14.3"
-    val Gson         = "2.9.1"
+    val Gson         = "2.9.0"
     val Http4s       = "1.0.0-M37"
     val MUnitCE3     = "1.0.7"
     val Scout        = "0.2.1"
     val Slf4j        = "2.0.6"
     // val Tsec         = "0.2.1"
+  }
 
   val BouncyCastle      = "org.bouncycastle" % "bcprov-jdk15on"      % Versions.BouncyCastle
   val CirceGeneric      = "io.circe"        %% "circe-generic"       % Versions.Circe
@@ -27,11 +28,14 @@ object Dependencies:
 //  val TsecHash          = "io.github.jmcardon" %% "tsec-hash-bouncy"    % Versions.Tsec
 //  val TsecMac           = "io.github.jmcardon" %% "tsec-mac"            % Versions.Tsec
 
-  object Protobuf:
+  object Protobuf {
     val ScalaPb = "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
+  }
 
-  object Test:
-    val Annotations = "org.jetbrains"        % "annotations"         % Versions.Annotations % "test"
-    val MUnitCE3    = "org.typelevel"       %% "munit-cats-effect-3" % Versions.MUnitCE3    % "test"
-    val Slf4jApi    = "org.slf4j"            % "slf4j-api"           % Versions.Slf4j       % "test"
-    val Gson        = "com.google.code.gson" % "gson"                % Versions.Gson        % "test"
+  object Test {
+    val Annotations = "org.jetbrains" % "annotations"         % Versions.Annotations % "test"
+    val MUnitCE3 = "org.typelevel"   %% "munit-cats-effect-3" % Versions.MUnitCE3    % "test"
+    val Slf4jApi = "org.slf4j"        % "slf4j-api"           % Versions.Slf4j       % "test"
+    val Gson = "com.google.code.gson" % "gson"                % Versions.Gson        % "test"
+  }
+}
