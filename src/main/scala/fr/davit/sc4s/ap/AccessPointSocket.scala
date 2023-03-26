@@ -39,21 +39,21 @@ trait AccessPointSocket[F[_]]:
 
 object AccessPointSocket:
 
-  def client[F[_]: Sync](
+  def client[F[_]](
       socket: Socket[F]
-  ): Resource[F, AccessPointSocket[F]] =
+  )(implicit F: Sync[F]): Resource[F, AccessPointSocket[F]] =
 
     def encode[T](data: T)(implicit encoder: Encoder[T]): F[ByteVector] =
-      Sync[F].delay(encoder.encode(data).require.toByteVector)
+      F.delay(encoder.encode(data).require.toByteVector)
 
     def decode[T](bytes: ByteVector)(implicit decoder: Decoder[T]): F[T] =
-      Sync[F].delay(decoder.decode(bytes.toBitVector).require.value)
+      F.delay(decoder.decode(bytes.toBitVector).require.value)
 
     def handshake(): F[(Key, Key)] =
       import AccessPointProtocol.Handshake.*
 
       for
-        keyPair <- Sync[F].delay(DiffieHellman.generateKeyPair())
+        keyPair <- F.delay(DiffieHellman.generateKeyPair())
         (priv, pub) = keyPair
         handshakeHelloMessage     <- encode(HandshakeHello(pub))
         _                         <- socket.write(Chunk.byteVector(handshakeHelloMessage))
@@ -62,10 +62,10 @@ object AccessPointSocket:
         handshakeChallengePayload <- socket.readN(handshakeChallengeSize).map(_.toByteVector)
         handshakeChallengeMessage = handshakeChallengeHeader ++ handshakeChallengePayload
         handshakeChallenge <- decode[HandshakeChallenge](handshakeChallengeMessage)
-        secret             <- Sync[F].delay(DiffieHellman.secret(priv, handshakeChallenge.serverKey))
+        secret             <- F.delay(DiffieHellman.secret(priv, handshakeChallenge.serverKey))
         sharedKey     = new SecretKeySpec(secret, HmacSHA1.Algorithm)
         challengeData = handshakeHelloMessage ++ handshakeChallengeMessage
-        data <- Sync[F].delay {
+        data <- F.delay {
           (1 to 5)
             .map(i => HmacSHA1.digest(sharedKey, (challengeData ++ ByteVector.fromInt(i, size = 1)).toArray))
             .reduce(_ ++ _)
@@ -73,7 +73,7 @@ object AccessPointSocket:
         secretKey = new SecretKeySpec(data, 0, 20, HmacSHA1.Algorithm)
         encodeKey = new SecretKeySpec(data, 20, 32, Shannon.Algorithm)
         decodeKey = new SecretKeySpec(data, (20 + 32), 32, Shannon.Algorithm)
-        answer                   <- Sync[F].delay(HmacSHA1.digest(secretKey, challengeData.toArray))
+        answer                   <- F.delay(HmacSHA1.digest(secretKey, challengeData.toArray))
         handshakeResponseMessage <- encode(HandshakeResponse(answer))
         _                        <- socket.write(Chunk.byteVector(handshakeResponseMessage))
       yield (encodeKey, decodeKey)
@@ -88,11 +88,11 @@ object AccessPointSocket:
         def read[T <: AccessPointResponse: Decoder](): F[T] = for
           payload <- engine.read()
           message <- decode[T](payload)
-          _       <- Sync[F].delay(println(message))
+          _       <- F.delay(println(message))
         yield message
 
         override def write[T <: AccessPointRequest: Encoder](message: T): F[Unit] = for
-          _       <- Sync[F].delay(println(message))
+          _       <- F.delay(println(message))
           payload <- encode(message)
           _       <- engine.write(payload)
         yield ()

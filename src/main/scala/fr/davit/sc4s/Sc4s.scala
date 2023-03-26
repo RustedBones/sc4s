@@ -19,7 +19,7 @@ package fr.davit.sc4s
 import cats.Show
 import cats.implicits.*
 import cats.effect.*
-import cats.effect.std.Hotswap
+import cats.effect.std.{Hotswap, Mutex}
 import com.comcast.ip4s.*
 import fr.davit.sc4s.ap.{AccessPoint, Session}
 import fr.davit.sc4s.security.{DiffieHellman, ShannonCipher}
@@ -54,12 +54,13 @@ object Sc4s extends IOApp:
       client <- EmberClientBuilder.default[IO].build
       app <- Resource.eval {
         for
+          m    <- Mutex[IO]
           s    <- shs.swap(Resource.pure(Session.Idle))
           sr   <- Ref.of[IO, Session](s)
           keys <- IO(DiffieHellman.generateKeyPair())
         yield
           val (priv, pub) = keys
-          val service     = Discovery.service(client, shs, sr, DeviceId, priv, pub)
+          val service     = Discovery.service(m, client, shs, sr, DeviceId, priv, pub)
           Router(ZeroconfAppPath -> service).orNotFound
       }
       server <- EmberServerBuilder
