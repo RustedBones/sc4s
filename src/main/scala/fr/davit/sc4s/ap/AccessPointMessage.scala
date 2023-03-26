@@ -40,6 +40,7 @@ final case class AuthenticationFailure(code: ErrorCode) extends AuthenticationMe
 
 sealed trait KeepAliveMessage
 final case class Ping(payload: ByteVector) extends KeepAliveMessage with AccessPointResponse
+object PongAck extends KeepAliveMessage with AccessPointResponse
 final case class Pong(payload: ByteVector) extends KeepAliveMessage with AccessPointRequest
 
 sealed trait SessionMessage
@@ -50,5 +51,14 @@ final case class ProductInfo(info: String) extends SessionMessage with AccessPoi
 final case class LegacyWelcome(payload: ByteVector) extends SessionMessage with AccessPointResponse
 final case class Unknown(payload: ByteVector) extends SessionMessage with AccessPointResponse
 
-final case class MercuryMessage(sequenceId: Long, header: MercuryHeader, payload: Vector[ByteVector]) extends AccessPointRequest with AccessPointResponse
+
+sealed trait MercuryMessage {
+  def sequenceId: Long
+}
+
+final case class MercuryEvent(sequenceId: Long, uri: String, payload: Vector[ByteVector]) extends MercuryMessage with AccessPointResponse
+final case class MercuryResponse(sequenceId: Long, uri: String, statusCode: Int, payload: Vector[ByteVector]) extends MercuryMessage with AccessPointResponse
+final case class MercuryRequest(sequenceId: Long, uri: String, payload: Vector[ByteVector]) extends MercuryMessage with AccessPointRequest
+final case class MercurySubscribe(sequenceId: Long, uri: String) extends MercuryMessage with AccessPointRequest
+final case class MercuryUnsubscribe(sequenceId: Long, uri: String) extends MercuryMessage with AccessPointRequest
 // format: on
