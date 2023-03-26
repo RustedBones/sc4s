@@ -3,15 +3,15 @@ import sbt._
 object Dependencies {
 
   object Versions {
-    val Annotations  = "16.0.2"
-    val BouncyCastle = "1.69"
-    val Circe        = "0.14.3"
-    val Gson         = "2.9.0"
-    val Http4s       = "1.0.0-M38"
-    val Http4sJdk    = "1.0.0-M8"
+    val Annotations  = "24.0.1"
+    val BouncyCastle = "1.70"
+    val Circe        = "0.14.5"
+    val Gson         = "2.10.1"
+    val Http4s       = "1.0.0-M39"
+    val Http4sJdk    = "1.0.0-M9"
     val MUnitCE3     = "1.0.7"
     val Scout        = "0.2.1"
-    val Slf4j        = "2.0.6"
+    val Slf4j        = "2.0.7"
     // val Tsec         = "0.2.1"
   }
 
