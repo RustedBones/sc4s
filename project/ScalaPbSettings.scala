@@ -1,9 +1,11 @@
-import sbt.Keys.*
-import sbt.*
-import sbtprotoc.ProtocPlugin.autoImport.*
+import sbt.Keys._
+import sbt._
+import sbtprotoc.ProtocPlugin.autoImport._
 
-object ScalaPbSettings:
+object ScalaPbSettings {
 
-  def defaults: Seq[Setting[?]] = Seq(
+  def defaults: Seq[Setting[_]] = Seq(
     (Compile / PB.targets) := Seq(scalapb.gen() -> (Compile / sourceManaged).value / "proto")
   )
+
+}
