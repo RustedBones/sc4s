@@ -36,10 +36,10 @@ object Mercury:
   trait Client[F[_]]:
     def send(request: Request): F[Deferred[F, Response]]
 
-  def client[F[_]: Async](
+  def client[F[_]](
       input: Topic[F, AccessPointResponse],
       output: Queue[F, AccessPointRequest]
-  ): Resource[F, Client[F]] =
+  )(implicit F: Async[F]): Resource[F, Client[F]] =
     for
       sequence <- Resource.eval(Ref.of[F, Long](1L))
       pending  <- Resource.eval(Ref.of[F, Map[Long, Deferred[F, Response]]](Map.empty))
@@ -47,18 +47,16 @@ object Mercury:
         .subscribe(10)
         .evalMap {
           case resp: MercuryResponse =>
-            if (resp.statusCode >= 200 && resp.statusCode < 300) {
+            if resp.statusCode >= 200 && resp.statusCode < 300 then
               (for
                 p <- OptionT(pending.modify(ps => (ps - resp.sequenceId, ps.get(resp.sequenceId))))
                 _ <- OptionT.liftF(p.complete(Response(resp.payload)))
               yield ()).value.void
-            } else {
-              Sync[F].raiseError(new MercuryException(resp.statusCode))
-            }
+            else F.raiseError(new MercuryException(resp.statusCode))
           case event: MercuryEvent =>
-            Sync[F].delay(println(event))
+            F.unit
           case _ =>
-            Sync[F].unit
+            F.unit
         }
         .compile
         .drain

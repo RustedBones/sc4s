@@ -9,15 +9,15 @@ import fs2.concurrent.Topic
 trait KeepAlive
 
 object KeepAlive:
-  def client[F[_]: Spawn: Async](
+  def client[F[_]: Spawn](
       in: Topic[F, AccessPointResponse],
       out: Queue[F, AccessPointRequest]
-  ): Resource[F, KeepAlive] = in
+  )(implicit F: Async[F]): Resource[F, KeepAlive] = in
     .subscribe(10)
     .collect { case m: KeepAliveMessage => m }
     .evalTap {
       case Ping(payload) => out.offer(Pong(payload))
-      case PongAck       => Sync[F].unit
+      case PongAck       => F.unit
     }
     .compile
     .drain

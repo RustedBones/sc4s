@@ -17,12 +17,13 @@
 package fr.davit.sc4s
 
 import java.time.Instant
+import scala.annotation.targetName
 import scala.concurrent.duration.*
 
-enum Scope(val value: String):
-  case PlaylistRead extends Scope("playlist-read")
+enum Scope:
+  case `playlist-read`
 
-case class Token(value: String, scopes: List[Scope], expiresAt: Instant)
+case class Token(value: String, scope: List[Scope], expiresAt: Instant)
 
 object Token:
   private val ValidityThreshold: FiniteDuration = 10.seconds

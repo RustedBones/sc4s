@@ -19,6 +19,7 @@ package fr.davit.sc4s
 import cats.effect
 import cats.effect.*
 import cats.effect.std.{Hotswap, Mutex}
+import cats.effect.implicits.*
 import cats.implicits.*
 import fr.davit.sc4s.ap.{AccessPoint, Session}
 import com.spotify.authentication.AuthenticationType
@@ -52,7 +53,7 @@ object Discovery:
 
   private case class Credentials(tpe: AuthenticationType.Recognized, authData: Array[Byte])
 
-  implicit private def addUserEntityDecoder[F[_]: Async]: EntityDecoder[F, AddUser] =
+  implicit private def addUserEntityDecoder[F[_]](implicit F: Async[F]): EntityDecoder[F, AddUser] =
     UrlForm
       .entityDecoder[F]
       .flatMapR { form =>
@@ -71,14 +72,14 @@ object Discovery:
               DecodeResult.failureT[F, String](InvalidMessageBodyFailure("Missing userName", None))
           blob <- form.getFirst("blob") match
             case Some(blobStr) if blobStr.nonEmpty =>
-              DecodeResult.success(Sync[F].delay(Base64.getDecoder.decode(blobStr)))
+              DecodeResult.success(F.delay(Base64.getDecoder.decode(blobStr)))
             case _ =>
               DecodeResult.failureT[F, Array[Byte]](InvalidMessageBodyFailure("Missing blob", None))
           clientKey <- form.getFirst("clientKey") match
             case Some(keyStr) if keyStr.nonEmpty =>
               val key = for
-                y <- Sync[F].delay(BigInt(1, Base64.getDecoder.decode(keyStr)))
-                k <- Sync[F].delay(DiffieHellman.generatePublicKey(y))
+                y <- F.delay(BigInt(1, Base64.getDecoder.decode(keyStr)))
+                k <- F.delay(DiffieHellman.generatePublicKey(y))
               yield k
               DecodeResult.success(key)
             case _ =>
@@ -108,13 +109,13 @@ object Discovery:
       authData <- bytes(dataSize).map(_.toArray)
     yield Credentials(tpe, authData)
 
-  private def decryptBlob[F[_]: Sync](
+  private def decryptBlob[F[_]](
       privateKey: DHPrivateKey,
       publicKey: DHPublicKey,
       iv: IvParameterSpec,
       checksum: Array[Byte],
       data: Array[Byte]
-  ): F[Array[Byte]] = Sync[F].delay {
+  )(implicit F: Sync[F]): F[Array[Byte]] = F.delay {
     val secret       = DiffieHellman.secret(privateKey, publicKey)
     val secretHash   = Sha1.digest(secret)
     val secretKey    = new SecretKeySpec(secretHash, 0, 16, HmacSHA1.Algorithm)
@@ -127,11 +128,11 @@ object Discovery:
     AES.decrypt(AES.CTR, AES.NoPadding, encryptionKey, iv, data)
   }
 
-  private def decryptCredentials[F[_]: Sync](
+  private def decryptCredentials[F[_]](
       deviceId: String,
       userName: String,
       blob: Array[Byte]
-  ): F[Credentials] = Sync[F].delay {
+  )(implicit F: Sync[F]): F[Credentials] = F.delay {
     val data            = Base64.getDecoder.decode(blob)
     val password        = Sha1.digest(deviceId.getBytes)
     val baseKey         = PBKDF2HmacWithSHA1.generateSecretKey(password, userName.getBytes, 0x100, 20)
@@ -143,7 +144,7 @@ object Discovery:
     credentialsDecoder.decode(credentialsData.toBitVector).require.value
   }
 
-  def service[F[_]: Async](
+  def service[F[_]](
       mutex: Mutex[F],
       client: Client[F],
       sessionHS: Hotswap[F, Session],
@@ -151,7 +152,7 @@ object Discovery:
       deviceId: String,
       privateKey: DHPrivateKey,
       publicKey: DHPublicKey
-  ): HttpRoutes[F] =
+  )(implicit F: Async[F]): HttpRoutes[F] =
     val dsl = Http4sDsl[F]
     import dsl.*
     HttpRoutes
@@ -192,7 +193,7 @@ object Discovery:
                 val result = for
                   session <- sessionR.get
                   _ <- session match
-                    case Session.Connected(addUser.userName) => Sync[F].unit
+                    case Session.Connected(addUser.userName) => F.unit
                     case _ =>
                       for
                         blob <- decryptBlob(
@@ -210,8 +211,8 @@ object Discovery:
                         newSession <- sessionHS.swap(
                           AccessPoint.connect(
                             client,
-                            addUser.userName,
                             deviceId,
+                            addUser.userName,
                             credentials.tpe,
                             credentials.authData
                           )
@@ -227,7 +228,7 @@ object Discovery:
               }
               .handleErrorWith { e =>
                 val result = for
-                  _ <- Sync[F].delay(e.printStackTrace())
+                  _ <- F.delay(e.printStackTrace())
                   _ <- sessionHS.swap(Resource.pure(Session.Idle)).flatMap(sessionR.set)
                 yield e.getMessage
                 InternalServerError(result)

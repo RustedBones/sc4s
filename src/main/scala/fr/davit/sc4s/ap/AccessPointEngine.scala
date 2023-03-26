@@ -71,39 +71,40 @@ private[ap] object AccessPointEngine:
       codec.encode(message).flatMap(encrypt(cipher))
     }
 
-  def apply[F[_]: Sync](socket: Socket[F], encryptKey: Key, decryptKey: Key): F[AccessPointEngine[F]] = for
-    encryptIv    <- Sync[F].delay(Shannon.cipher(Shannon.Encrypt, encryptKey).getIV)
-    encryptNonce <- Ref.of[F, Int](0)
-    decryptIv    <- Sync[F].delay(Shannon.cipher(Shannon.Decrypt, decryptKey).getIV)
-    decryptNonce <- Ref.of[F, Int](0)
-  yield new AccessPointEngine[F]:
+  def apply[F[_]](socket: Socket[F], encryptKey: Key, decryptKey: Key)(implicit F: Sync[F]): F[AccessPointEngine[F]] =
+    for
+      encryptIv    <- F.delay(Shannon.cipher(Shannon.Encrypt, encryptKey).getIV)
+      encryptNonce <- Ref.of[F, Int](0)
+      decryptIv    <- F.delay(Shannon.cipher(Shannon.Decrypt, decryptKey).getIV)
+      decryptNonce <- Ref.of[F, Int](0)
+    yield new AccessPointEngine[F]:
 
-    def readN(numBytes: Int): F[BitVector] =
-      for
-        chunk <- socket.readN(numBytes)
-        _ <-
-          if chunk.size != numBytes then Sync[F].raiseError(new RuntimeException("Connection closed unexpectedly"))
-          else Sync[F].unit
-      yield chunk.toBitVector
+      def readN(numBytes: Int): F[BitVector] =
+        for
+          chunk <- socket.readN(numBytes)
+          _ <-
+            if chunk.size != numBytes then F.raiseError(new RuntimeException("Connection closed unexpectedly"))
+            else F.unit
+        yield chunk.toBitVector
 
-    override def read(): F[ByteVector] = for
-      nonce <- decryptNonce.modify(n => (n + 1, n))
-      param = new ShannonParameterSpec(decryptIv, nonce)
-      cipher      <- Sync[F].delay(Shannon.cipher(Shannon.Decrypt, decryptKey, param))
-      headerRaw   <- readN(HeaderSize)
-      header      <- Sync[F].delay(bytes.decrypted(cipher).decodeValue(headerRaw).require)
-      payloadSize <- Sync[F].delay(HeaderCodec.decodeValue(header.toBitVector).require)
-      payloadRaw  <- readN(payloadSize)
-      payload     <- Sync[F].delay(bytes.decrypted(cipher).decodeValue(payloadRaw).require)
-      mac         <- readN(ShannonCipher.BlockSize)
-      _           <- Sync[F].delay(cipher.doFinal(mac.toByteArray))
-    yield header ++ payload
+      override def read(): F[ByteVector] = for
+        nonce <- decryptNonce.modify(n => (n + 1, n))
+        param = new ShannonParameterSpec(decryptIv, nonce)
+        cipher      <- F.delay(Shannon.cipher(Shannon.Decrypt, decryptKey, param))
+        headerRaw   <- readN(HeaderSize)
+        header      <- F.delay(bytes.decrypted(cipher).decodeValue(headerRaw).require)
+        payloadSize <- F.delay(HeaderCodec.decodeValue(header.toBitVector).require)
+        payloadRaw  <- readN(payloadSize)
+        payload     <- F.delay(bytes.decrypted(cipher).decodeValue(payloadRaw).require)
+        mac         <- readN(ShannonCipher.BlockSize)
+        _           <- F.delay(cipher.doFinal(mac.toByteArray))
+      yield header ++ payload
 
-    override def write(message: ByteVector): F[Unit] = for
-      nonce <- encryptNonce.modify(n => (n + 1, n))
-      param = new ShannonParameterSpec(encryptIv, nonce)
-      cipher     <- Sync[F].delay(Shannon.cipher(Shannon.Encrypt, encryptKey, param))
-      messageRaw <- Sync[F].delay(bytes.encrypted(cipher).encode(message).require)
-      mac        <- Sync[F].delay(ByteVector.view(cipher.doFinal()))
-      _          <- socket.write(Chunk.byteVector(messageRaw.toByteVector ++ mac))
-    yield ()
+      override def write(message: ByteVector): F[Unit] = for
+        nonce <- encryptNonce.modify(n => (n + 1, n))
+        param = new ShannonParameterSpec(encryptIv, nonce)
+        cipher     <- F.delay(Shannon.cipher(Shannon.Encrypt, encryptKey, param))
+        messageRaw <- F.delay(bytes.encrypted(cipher).encode(message).require)
+        mac        <- F.delay(ByteVector.view(cipher.doFinal()))
+        _          <- socket.write(Chunk.byteVector(messageRaw.toByteVector ++ mac))
+      yield ()
