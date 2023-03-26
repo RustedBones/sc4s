@@ -35,9 +35,9 @@ object Dependencies {
   }
 
   object Test {
-    val Annotations = "org.jetbrains" % "annotations"         % Versions.Annotations % "test"
-    val MUnitCE3 = "org.typelevel"   %% "munit-cats-effect-3" % Versions.MUnitCE3    % "test"
-    val Slf4jApi = "org.slf4j"        % "slf4j-api"           % Versions.Slf4j       % "test"
-    val Gson = "com.google.code.gson" % "gson"                % Versions.Gson        % "test"
+    val Annotations = "org.jetbrains"        % "annotations"         % Versions.Annotations % "test"
+    val MUnitCE3    = "org.typelevel"       %% "munit-cats-effect-3" % Versions.MUnitCE3    % "test"
+    val Slf4jApi    = "org.slf4j"            % "slf4j-api"           % Versions.Slf4j       % "test"
+    val Gson        = "com.google.code.gson" % "gson"                % Versions.Gson        % "test"
   }
 }
