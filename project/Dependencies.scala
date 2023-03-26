@@ -11,7 +11,7 @@ object Dependencies {
     val Http4sJdk    = "1.0.0-M8"
     val MUnitCE3     = "1.0.7"
     val Scout        = "0.2.1"
-    val Slf4j        = "2.0.6"
+    val Slf4j        = "2.0.7"
     // val Tsec         = "0.2.1"
   }
 
