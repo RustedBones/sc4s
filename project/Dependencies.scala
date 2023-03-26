@@ -3,7 +3,7 @@ import sbt._
 object Dependencies {
 
   object Versions {
-    val Annotations  = "16.0.2"
+    val Annotations  = "16.0.3"
     val BouncyCastle = "1.69"
     val Circe        = "0.14.3"
     val Gson         = "2.9.0"
