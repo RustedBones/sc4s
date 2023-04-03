@@ -21,6 +21,7 @@ import cats.effect.*
 import cats.effect.std.{Hotswap, Mutex}
 import cats.effect.implicits.*
 import cats.implicits.*
+import com.comcast.ip4s.Literals.ipv4
 import fr.davit.sc4s.ap.{AccessPoint, Session}
 import com.spotify.authentication.AuthenticationType
 import fr.davit.sc4s.security.*
@@ -31,6 +32,11 @@ import org.http4s.client.Client
 import org.http4s.circe.*
 import org.http4s.dsl.Http4sDsl
 import org.http4s.dsl.impl.QueryParamDecoderMatcher
+import org.http4s.ember.server.EmberServerBuilder
+import org.http4s.server.Server
+import org.http4s.server.Router
+import com.comcast.ip4s.*
+import org.http4s.ember.client.EmberClientBuilder
 import scodec.Attempt.{Failure, Successful}
 import scodec.Err
 import scodec.bits.*
@@ -144,26 +150,30 @@ object Discovery:
     credentialsDecoder.decode(credentialsData.toBitVector).require.value
   }
 
-  def service[F[_]](
-      mutex: Mutex[F],
-      client: Client[F],
-      sessionHS: Hotswap[F, Session],
-      sessionR: Ref[F, Session],
+  def discovery[F[_]](
       deviceId: String,
-      privateKey: DHPrivateKey,
-      publicKey: DHPublicKey
-  )(implicit F: Async[F]): HttpRoutes[F] =
-    val dsl = Http4sDsl[F]
-    import dsl.*
-    HttpRoutes
-      .of[F] {
+      path: String,
+      client: Client[F],
+      sessionHotSwap: Hotswap[F, Session]
+  )(implicit F: Async[F]): F[HttpApp[F]] =
+    for
+      keys <- F.delay(DiffieHellman.generateKeyPair())
+      (privateKey, publicKey) = keys
+      mutex       <- Mutex[F]
+      sessionInit <- sessionHotSwap.swap(Resource.pure(Session.Idle))
+      sessionRef  <- Ref.of[F, Session](sessionInit)
+    yield
+      val dsl = Http4sDsl[F]
+      import dsl.*
+      val routes = HttpRoutes.of[F] {
         case GET -> Root :? ActionParam("getInfo") =>
-          val result = for
-            session <- sessionR.get
-            userName = session match
+          val result = sessionRef.get
+            .map {
               case Session.Connected(u) => Some(u)
               case Session.Idle         => None
-          yield json"""{
+            }
+            .map { userName =>
+              json"""{
               "status": 101,
               "statusString": "OK",
               "spotifyError": 0,
@@ -185,13 +195,14 @@ object Discovery:
               "deviceType": "COMPUTER",
               "activeUser": $userName
             }"""
+            }
           Ok(result)
         case request @ POST -> Root =>
           mutex.lock.surround {
             request
               .decode { (addUser: AddUser) =>
                 val result = for
-                  session <- sessionR.get
+                  session <- sessionRef.get
                   _ <- session match
                     case Session.Connected(addUser.userName) => F.unit
                     case _ =>
@@ -208,7 +219,7 @@ object Discovery:
                           addUser.userName,
                           blob
                         )
-                        newSession <- sessionHS.swap(
+                        newSession <- sessionHotSwap.swap(
                           AccessPoint.connect(
                             client,
                             deviceId,
@@ -217,21 +228,42 @@ object Discovery:
                             credentials.authData
                           )
                         )
-                        _ <- sessionR.set(newSession)
+                        _ <- sessionRef.set(newSession)
                       yield ()
                 yield json"""{
-                  "status": 200,
-                  "statusString": "OK",
-                  "spotifyError": 0
-                }"""
+                "status": 200,
+                "statusString": "OK",
+                "spotifyError": 0
+              }"""
                 Ok(result)
               }
               .handleErrorWith { e =>
                 val result = for
                   _ <- F.delay(e.printStackTrace())
-                  _ <- sessionHS.swap(Resource.pure(Session.Idle)).flatMap(sessionR.set)
+                  _ <- sessionHotSwap.swap(Resource.pure(Session.Idle)).flatMap(sessionRef.set)
                 yield e.getMessage
                 InternalServerError(result)
               }
           }
       }
+
+      Router(path -> routes).orNotFound
+  end discovery
+
+  def service[F[_]: Concurrent](
+      deviceId: String,
+      path: String,
+      host: Host,
+      port: Port
+  )(implicit F: Async[F]): Resource[F, Server] = for
+    client         <- EmberClientBuilder.default[F].build
+    sessionHotSwap <- Hotswap.create[F, Session]
+    app            <- Resource.eval(discovery(deviceId, path, client, sessionHotSwap))
+    server <- EmberServerBuilder
+      .default[F]
+      .withHost(host)
+      .withPort(port)
+      .withMaxConnections(1) // serve only one client at a time
+      .withHttpApp(app)
+      .build
+  yield server
