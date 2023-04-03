@@ -37,6 +37,7 @@ import org.http4s.server.Server
 import org.http4s.server.Router
 import com.comcast.ip4s.*
 import org.http4s.ember.client.EmberClientBuilder
+import org.typelevel.log4cats.LoggerFactory
 import scodec.Attempt.{Failure, Successful}
 import scodec.Err
 import scodec.bits.*
@@ -150,7 +151,7 @@ object Discovery:
     credentialsDecoder.decode(credentialsData.toBitVector).require.value
   }
 
-  def discovery[F[_]](
+  def discovery[F[_]: LoggerFactory](
       deviceId: String,
       path: String,
       client: Client[F],
@@ -250,7 +251,7 @@ object Discovery:
       Router(path -> routes).orNotFound
   end discovery
 
-  def service[F[_]: Concurrent](
+  def service[F[_]: Concurrent: LoggerFactory](
       deviceId: String,
       path: String,
       host: Host,

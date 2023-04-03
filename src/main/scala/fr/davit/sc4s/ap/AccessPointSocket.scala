@@ -21,6 +21,7 @@ import cats.implicits.*
 import fr.davit.sc4s.security.*
 import fs2.*
 import fs2.io.net.Socket
+import org.typelevel.log4cats.*
 import scodec.bits.*
 import scodec.*
 
@@ -39,9 +40,10 @@ trait AccessPointSocket[F[_]]:
 
 object AccessPointSocket:
 
-  def client[F[_]](
+  def client[F[_]: LoggerFactory](
       socket: Socket[F]
   )(implicit F: Sync[F]): Resource[F, AccessPointSocket[F]] =
+    val logger = LoggerFactory[F].getLogger
 
     def encode[T](data: T)(implicit encoder: Encoder[T]): F[ByteVector] =
       F.delay(encoder.encode(data).require.toByteVector)
@@ -51,7 +53,6 @@ object AccessPointSocket:
 
     def handshake(): F[(Key, Key)] =
       import AccessPointProtocol.Handshake.*
-
       for
         keyPair <- F.delay(DiffieHellman.generateKeyPair())
         (priv, pub) = keyPair
@@ -88,11 +89,11 @@ object AccessPointSocket:
         def read[T <: AccessPointResponse: Decoder](): F[T] = for
           payload <- engine.read()
           message <- decode[T](payload)
-          _       <- F.delay(println(message))
+          _       <- logger.debug(s"$message")
         yield message
 
         override def write[T <: AccessPointRequest: Encoder](message: T): F[Unit] = for
-          _       <- F.delay(println(message))
+          _       <- logger.debug(s"$message")
           payload <- encode(message)
           _       <- engine.write(payload)
         yield ()

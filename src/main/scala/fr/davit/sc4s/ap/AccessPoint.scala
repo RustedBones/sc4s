@@ -35,6 +35,7 @@ import org.http4s.client.Client
 import org.http4s.client.websocket.*
 import org.http4s.implicits.*
 import org.http4s.jdkhttpclient.JdkWSClient
+import org.typelevel.log4cats.LoggerFactory
 import scalapb.GeneratedMessage
 
 import java.net.InetSocketAddress
@@ -86,17 +87,18 @@ object AccessPoint:
       .map(Random.shuffle(_))
       .map(_.headOption)
 
-  def connect[F[_]: Spawn](
+  def connect[F[_]: Spawn: LoggerFactory](
       client: Client[F],
       deviceId: String,
       userName: String,
       tpe: AuthenticationType.Recognized,
       authData: Array[Byte]
   )(implicit F: Async[F]): Resource[F, Session] =
-    val login = AuthenticationRequest(deviceId, userName, tpe, authData)
+    val logger = LoggerFactory[F].getLogger
+    val login  = AuthenticationRequest(deviceId, userName, tpe, authData)
     for
       address <- Resource.eval(resolve(client, ResourceType.accesspoint).map(_.getOrElse(DefaultAp)))
-      _       <- Resource.eval(F.delay(println(s"Connecting to $address")))
+      _       <- Resource.eval(logger.debug("Connecting to $address"))
       socket  <- Network[F].client(SocketAddress.fromInetSocketAddress(address))
       ap      <- AccessPointSocket.client(socket)
       // login
@@ -138,7 +140,7 @@ object AccessPoint:
         .compile
         .drain
         .background
-      _ <- Resource.eval(F.delay(println(s"Authenticated as $userName")))
+      _ <- Resource.eval(logger.info(s"Authenticated as $userName"))
     yield Session.Connected(userName)
   end connect
 
