@@ -4,7 +4,7 @@ object Dependencies {
 
   object Versions {
     val Annotations  = "24.0.1"
-    val BouncyCastle = "1.70"
+    val BouncyCastle = "1.72"
     val Circe        = "0.14.5"
     val Gson         = "2.10.1"
     val Http4s       = "1.0.0-M39"
@@ -15,7 +15,7 @@ object Dependencies {
     // val Tsec         = "0.2.1"
   }
 
-  val BouncyCastle      = "org.bouncycastle" % "bcprov-jdk15on"         % Versions.BouncyCastle
+  val BouncyCastle      = "org.bouncycastle" % "bcprov-jdk18on"         % Versions.BouncyCastle
   val CirceGeneric      = "io.circe"        %% "circe-generic"          % Versions.Circe
   val CirceLiteral      = "io.circe"        %% "circe-literal"          % Versions.Circe
   val CirceParser       = "io.circe"        %% "circe-parser"           % Versions.Circe
