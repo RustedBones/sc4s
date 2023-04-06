@@ -28,6 +28,9 @@ import org.http4s.ember.client.EmberClientBuilder
 import org.http4s.ember.server.EmberServerBuilder
 import org.http4s.implicits.*
 import scalapb.GeneratedMessage
+import org.typelevel.log4cats.*
+import org.typelevel.log4cats.slf4j.loggerFactoryforSync
+import org.typelevel.log4cats.slf4j.Slf4jFactory
 
 import java.net.InetAddress
 import java.security.Security
@@ -42,6 +45,7 @@ object Sc4s extends IOApp:
 
   val DeviceId = Random.nextBytes(20).map("%02x".format(_)).mkString
 
+  implicit val logging: LoggerFactory[IO]          = Slf4jFactory[IO]
   implicit val MessageShow: Show[GeneratedMessage] = Show.fromToString
 
   Security.addProvider(ShannonCipher.ShannonCipherProvider)
@@ -50,6 +54,7 @@ object Sc4s extends IOApp:
     Discovery
       .service[IO](DeviceId, ZeroconfAppPath, ipv4"0.0.0.0", port"0")
       .use { server =>
+        val logger = logging.getLogger
         val zeroconf = Zeroconf.Instance(
           ZeroconfService,
           "sc4s",
@@ -59,7 +64,7 @@ object Sc4s extends IOApp:
         )
 
         for
-          _ <- IO(println(s"zc server listening on ${server.baseUri}"))
+          _ <- logger.info(s"zc server listening on ${server.baseUri}")
           _ <- Zeroconf.register[IO](zeroconf).compile.drain
         yield ExitCode.Success
       }

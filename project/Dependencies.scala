@@ -9,9 +9,10 @@ object Dependencies {
     val Gson         = "2.10.1"
     val Http4s       = "1.0.0-M39"
     val Http4sJdk    = "1.0.0-M9"
+    val Log4Cats     = "2.5.0"
+    val Logback      = "1.4.6"
     val MUnitCE3     = "1.0.7"
     val Scout        = "0.2.1"
-    val Slf4j        = "2.0.7"
     // val Tsec         = "0.2.1"
   }
 
@@ -24,11 +25,16 @@ object Dependencies {
   val Http4sEmberClient = "org.http4s"      %% "http4s-ember-client"    % Versions.Http4s
   val Http4sEmberServer = "org.http4s"      %% "http4s-ember-server"    % Versions.Http4s
   val Http4sJdkClient   = "org.http4s"      %% "http4s-jdk-http-client" % Versions.Http4sJdk
+  val Log4CatsSlf4j     = "org.typelevel"   %% "log4cats-slf4j"         % Versions.Log4Cats
   val Scout             = "fr.davit"        %% "scout"                  % Versions.Scout
 //  val TsecCommon        = "io.github.jmcardon" %% "tsec-common"         % Versions.Tsec
 //  val TsecCipher        = "io.github.jmcardon" %% "tsec-cipher-bouncy"  % Versions.Tsec
 //  val TsecHash          = "io.github.jmcardon" %% "tsec-hash-bouncy"    % Versions.Tsec
 //  val TsecMac           = "io.github.jmcardon" %% "tsec-mac"            % Versions.Tsec
+
+  object Runtime {
+    val LogbackClassic = "ch.qos.logback" % "logback-classic" % Versions.Logback % "runtime"
+  }
 
   object Protobuf {
     val ScalaPb = "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
@@ -37,7 +43,6 @@ object Dependencies {
   object Test {
     val Annotations = "org.jetbrains"        % "annotations"         % Versions.Annotations % "test"
     val MUnitCE3    = "org.typelevel"       %% "munit-cats-effect-3" % Versions.MUnitCE3    % "test"
-    val Slf4jApi    = "org.slf4j"            % "slf4j-api"           % Versions.Slf4j       % "test"
     val Gson        = "com.google.code.gson" % "gson"                % Versions.Gson        % "test"
   }
 }

@@ -71,7 +71,9 @@ lazy val `sc4s` = (project in file("."))
       Dependencies.Http4sEmberClient,
       Dependencies.Http4sEmberServer,
       Dependencies.Http4sJdkClient,
+      Dependencies.Log4CatsSlf4j,
       Dependencies.Scout,
+      Dependencies.Runtime.LogbackClassic,
       Dependencies.Protobuf.ScalaPb,
 //      Dependencies.TsecCommon,
 //      Dependencies.TsecCipher,
@@ -79,7 +81,6 @@ lazy val `sc4s` = (project in file("."))
 //      Dependencies.TsecMac,
       Dependencies.Test.Annotations,
       Dependencies.Test.Gson,
-      Dependencies.Test.MUnitCE3,
-      Dependencies.Test.Slf4jApi
+      Dependencies.Test.MUnitCE3
     )
   )
