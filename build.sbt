@@ -17,21 +17,21 @@ ThisBuild / githubWorkflowBuild := Seq(
   WorkflowStep.Sbt(name = Some("Check project"), commands = List("scalafmtCheckAll", "headerCheckAll")),
   WorkflowStep.Sbt(name = Some("Build project"), commands = List("compile", "test"))
 )
-ThisBuild / githubWorkflowTargetBranches := Seq("main")
+ThisBuild / githubWorkflowTargetBranches        := Seq("main")
 ThisBuild / githubWorkflowPublishTargetBranches := Seq.empty
 
 lazy val commonSettings =
   ScalaPbSettings.defaults ++
     Seq(
-      organization := "fr.davit",
+      organization     := "fr.davit",
       organizationName := "Michel Davit",
-      version := "0.1.0-SNAPSHOT",
-      scalaVersion := (ThisBuild / scalaVersion).value,
+      version          := "0.1.0-SNAPSHOT",
+      scalaVersion     := (ThisBuild / scalaVersion).value,
       scalacOptions ~= filterScalacOptions,
       homepage := Some(url(s"https://github.com/$username/$repo")),
       licenses += ("Apache-2.0", new URL("https://www.apache.org/licenses/LICENSE-2.0.txt")),
       startYear := Some(2021),
-      scmInfo := Some(ScmInfo(url(s"https://github.com/$username/$repo"), s"git@github.com:$username/$repo.git")),
+      scmInfo   := Some(ScmInfo(url(s"https://github.com/$username/$repo"), s"git@github.com:$username/$repo.git")),
       developers := List(
         Developer(
           id = s"$username",
@@ -40,7 +40,7 @@ lazy val commonSettings =
           url = url(s"https://github.com/$username")
         )
       ),
-      publishMavenStyle := true,
+      publishMavenStyle      := true,
       Test / publishArtifact := false,
       publishTo := {
         val resolver = if (isSnapshot.value) {
@@ -80,6 +80,6 @@ lazy val `sc4s` = (project in file("."))
       Dependencies.Test.Annotations,
       Dependencies.Test.Gson,
       Dependencies.Test.MUnitCE3,
-      Dependencies.Test.Slf4jApi,
+      Dependencies.Test.Slf4jApi
     )
   )
