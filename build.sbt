@@ -4,11 +4,12 @@ import scala.annotation.nowarn
 val username = "RustedBones"
 val repo     = "sc4s"
 
-lazy val filterScalacOptions = options: Seq[String] =>
+lazy val filterScalacOptions = { options: Seq[String] =>
   options.filterNot { o =>
     // get rid of value discard
     o == "-Ywarn-value-discard" || o == "-Wvalue-discard"
   }
+}
 
 // for sbt-github-actions
 ThisBuild / scalaVersion := "3.2.2"
@@ -42,20 +43,22 @@ lazy val commonSettings =
       publishMavenStyle      := true,
       Test / publishArtifact := false,
       publishTo := {
-        val resolver =
-          if isSnapshot.value then Opts.resolver.sonatypeSnapshots: @nowarn("cat=deprecation")
-          else Opts.resolver.sonatypeStaging
+        val resolver = if (isSnapshot.value) {
+          Opts.resolver.sonatypeSnapshots: @nowarn("cat=deprecation")
+        } else {
+          Opts.resolver.sonatypeStaging
+        }
         Some(resolver)
       },
-      credentials ++= (for
+      credentials ++= (for {
         username <- sys.env.get("SONATYPE_USERNAME")
         password <- sys.env.get("SONATYPE_PASSWORD")
-      yield Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", username, password)).toSeq,
+      } yield Credentials("Sonatype Nexus Repository Manager", "oss.sonatype.org", username, password)).toSeq,
       testFrameworks += new TestFramework("munit.Framework")
     )
 
 lazy val `sc4s` = (project in file("."))
-  .settings(commonSettings*)
+  .settings(commonSettings: _*)
   .settings(
     headerSources / excludeFilter := HiddenFileFilter || (_.getPath.contains("xyz/gianlu/librespot")),
     libraryDependencies ++= Seq(
