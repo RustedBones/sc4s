@@ -9,7 +9,7 @@ object Dependencies {
     val Gson         = "2.10.1"
     val Http4s       = "1.0.0-M39"
     val Http4sJdk    = "1.0.0-M9"
-    val Log4Cats     = "2.5.0"
+    val Log4Cats     = "2.6.0"
     val Logback      = "1.4.6"
     val MUnitCE3     = "1.0.7"
     val Scout        = "0.2.1"
