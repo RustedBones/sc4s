@@ -4,7 +4,7 @@ object Dependencies {
 
   object Versions {
     val Annotations  = "24.0.1"
-    val BouncyCastle = "1.72"
+    val BouncyCastle = "1.75"
     val Circe        = "0.14.5"
     val Gson         = "2.10.1"
     val Http4s       = "1.0.0-M39"
