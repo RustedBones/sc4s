@@ -4,7 +4,7 @@ import sbtprotoc.ProtocPlugin.autoImport._
 
 object ScalaPbSettings {
 
-  def defaults: Seq[Setting[_]] = Seq(
+  def defaults: Seq[Setting[?]] = Seq(
     (Compile / PB.targets) := Seq(scalapb.gen() -> (Compile / sourceManaged).value / "proto")
   )
 
