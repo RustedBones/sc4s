@@ -7,7 +7,7 @@ object Dependencies {
     val BouncyCastle = "1.72"
     val Circe        = "0.14.5"
     val Gson         = "2.10.1"
-    val Http4s       = "1.0.0-M39"
+    val Http4s       = "1.0.0-M40"
     val Http4sJdk    = "1.0.0-M9"
     val Log4Cats     = "2.5.0"
     val Logback      = "1.4.6"
